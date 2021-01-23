@@ -158,6 +158,7 @@ template powop_wrap(T, _lop, _rop) {
                     }else if(PyObject_IsInstance(o2, cast(PyObject*)&wtype)) {
                         goto rop;
                     }else{
+                        pragma(msg, "DB HERE");
                         enforce(false, format(
                             "unsupported operand type(s) for %s: '%s' and '%s'",
                             opl.op, o1.ob_type.tp_name, o2.ob_type.tp_name,

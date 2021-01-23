@@ -238,9 +238,11 @@ PyObject* d_to_python(T) (T t) {
             isInputRange!T) {
         if (to_converter_registry!(T).dg) {
             return d_to_python_try_extends(t);
-        }else static if(__traits(compiles, wrap_range(t))) {
+        } else static if(AlwaysTry || __traits(compiles, wrap_range(t))) {
             assert(is_wrapped!(RangeWrapper*));
             return d_to_python(wrap_range(t));
+        } else {
+            pragma(msg, "Didn't compile - pyd.make_object.d_to_python");
         }
     } else static if (is(T == struct)) {
         alias Unqual!T Tu;

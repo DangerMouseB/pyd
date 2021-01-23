@@ -126,8 +126,26 @@ template wrapped_repr(T, alias fn) {
     }
 }
 
-private template ID(A){ alias A ID; }
-private struct CW(A...){ alias A C; }
+// why we no use method_wrap ?
+template wrapped__str__(T, alias fn) {
+    import std.string: format;
+
+    static assert(
+        constCompatible(constness!T, constness!(typeof(fn))),
+        format("constness mismatch instance: %s function: %s", T.stringof, typeof(fn).stringof)
+    );
+    alias get_dg = dg_wrapper!(T, typeof(&fn));
+    extern(C)
+    PyObject* __str__(PyObject* self) {
+        return exception_catcher(delegate PyObject*() {
+            auto dg = get_dg(get_d_reference!T(self), &fn);
+            return d_to_python(dg());
+        });
+    }
+}
+
+private template ID(A){ alias ID = A; }
+private struct CW(A...){ alias C = A; }
 
 template IsProperty(alias T) {
     enum bool IsProperty =
@@ -135,18 +153,18 @@ template IsProperty(alias T) {
 }
 
 template IsGetter(alias T) {
-    enum bool IsGetter = ParameterTypeTuple!T .length == 0 &&
+    enum bool IsGetter = Parameters!T .length == 0 &&
         !is(ReturnType!T == void);
 }
 
 template IsSetter(RT) {
     template IsSetter(alias T) {
-        enum bool IsSetter = ParameterTypeTuple!T .length == 1 &&
-                is(ParameterTypeTuple!(T)[0] == RT);
+        enum bool IsSetter = Parameters!T .length == 1 &&
+                is(Parameters!(T)[0] == RT);
     }
 }
 template IsAnySetter(alias T) {
-    enum bool IsAnySetter = ParameterTypeTuple!T .length == 1;
+    enum bool IsAnySetter = Parameters!T .length == 1;
 }
 
 // This template gets an alias to a property and derives the types of the
@@ -288,7 +306,9 @@ struct Def(alias fn, Options...) {
 }
 
 template _Def(alias _fn, string name, fn_t, string docstring) {
-    alias def_selector!(_fn,fn_t).FN func;
+    import d2py.func_wrap: method_wrap;
+
+    alias func=def_selector!(_fn,fn_t).FN;
     static assert(!__traits(isStaticFunction, func)); // TODO
     static assert((functionAttributes!fn_t & (
                     FunctionAttribute.nothrow_|
@@ -490,6 +510,26 @@ struct Repr(alias _fn) {
         enum shim = "";
     }
 }
+
+/**
+Wraps a method as the class's __str__ in Python.
+
+Params:
+_fn = The property to wrap. Must have the signature string function().
+*/
+struct Str(alias _fn) {
+    alias def_selector!(_fn, string function()).FN fn;
+    enum bool needs_shim = false;
+    static void call(string classname, T)() {
+        alias ApplyConstness!(T, constness!(typeof(fn))) cT;
+        alias PydTypeObject!(T) type;
+        type.tp_str = &wrapped__str__!(cT, fn).__str__;
+    }
+    template shim(size_t i,T) {
+        enum shim = "";
+    }
+}
+
 
 /**
 Wraps the constructors of the class.
@@ -1121,30 +1161,40 @@ struct OpSliceAssign(rhs_t = Guess) {
 struct OpCall(Args_t...) {
     enum bool needs_shim = false;
 
+    // DBHERE
+    import d2py.attributes : signatureWithAttributes;
+    pragma(msg, "pyd.class_wrap.OpCall #1");
+
+
     template Inner(T) {
         import std.string: format;
 
-        alias TypeTuple!(__traits(getOverloads, T, "opCall")) Overloads;
+        alias Overloads = TypeTuple!(__traits(getOverloads, T, "opCall"));
         template IsDesiredOverload(alias fn) {
-            alias ParameterTypeTuple!fn ps;
+            alias ps = Parameters!fn;
             enum bool IsDesiredOverload = is(ps == Args_t);
         }
-        alias Filter!(IsDesiredOverload, Overloads) VOverloads;
+        alias VOverloads = Filter!(IsDesiredOverload, Overloads);
         static if(VOverloads.length == 0) {
             static assert(0,
                     format("%s.opCall: cannot find signature %s", T.stringof,
                         Args_t.stringof));
         }else static if(VOverloads.length == 1){
-            alias VOverloads[0] FN;
+            alias FN = VOverloads[0];
         }else static assert(0,
                 format("%s.%s: cannot choose between %s", T.stringof, nom,
                     VOverloads.stringof));
     }
     static void call(string classname, T)() {
-        alias PydTypeObject!T type;
-        alias Inner!T.FN fn;
-        alias ApplyConstness!(T, constness!(typeof(fn))) cT;
-        type.tp_call = &opcall_wrap!(cT, fn).func;
+        alias type = PydTypeObject!T;
+        alias fn = Inner!T.FN;
+        alias cT = ApplyConstness!(T, constness!(typeof(fn)));
+
+        // DBHERE
+        alias f = opcall_wrap!(cT, fn);
+        pragma(msg, "pyd.class_wrap.OpCall.call #2  fn - "~signatureWithAttributes!fn);
+        type.tp_call = &f.func;
+        pragma(msg, "pyd.class_wrap.OpCall.call #3  f - "~signatureWithAttributes!f);
     }
     template shim(size_t i,T) {
         // bah
