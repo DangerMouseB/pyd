@@ -455,7 +455,7 @@ Dg PydCallable_AsDelegate(Dg) (PyObject* c) {
 }
 
 private template _pycallable_asdgT(Dg) if(is(Dg == delegate)) {
-    alias ParameterTypeTuple!(Dg) Info;
+    alias Parameters!(Dg) Info;
     alias ReturnType!(Dg) Tr;
 
     Dg func(PyObject* c) {
@@ -594,7 +594,7 @@ PyObject* arrangeNamedArgs(alias fn, string fname)(PyObject* args, PyObject* kwa
 }
 
 template minNumArgs_impl(alias fn, fnT) {
-    alias ParameterTypeTuple!(fnT) Params;
+    alias Parameters!(fnT) Params;
 	//https://issues.dlang.org/show_bug.cgi?id=17192
     //alias ParameterDefaultValueTuple!(fn) Defaults;
 	import pyd.util.typeinfo : WorkaroundParameterDefaults;
@@ -633,7 +633,7 @@ template minArgs(alias fn, fnT = typeof(&fn)) {
   */
 template maxArgs(alias fn, fn_t = typeof(&fn)) {
     alias variadicFunctionStyle!fn vstyle;
-    alias ParameterTypeTuple!fn ps;
+    alias Parameters!fn ps;
     /// _
     enum bool hasMax = vstyle == Variadic.no;
     /// _
@@ -648,7 +648,7 @@ bool supportsNArgs(alias fn, fn_t = typeof(&fn))(size_t n) {
         return false;
     }
     alias variadicFunctionStyle!fn vstyle;
-    alias ParameterTypeTuple!fn ps;
+    alias Parameters!fn ps;
 	//https://issues.dlang.org/show_bug.cgi?id=17192
     //alias ParameterDefaultValueTuple!fn defaults;
 	import pyd.util.typeinfo : WorkaroundParameterDefaults;
@@ -667,7 +667,7 @@ bool supportsNArgs(alias fn, fn_t = typeof(&fn))(size_t n) {
 /**
   Get the parameters of function as a string.
 
-  pt_alias refers to an alias of ParameterTypeTuple!fn
+  pt_alias refers to an alias of Parameters!fn
   visible to wherever you want to mix in the results.
   pd_alias refers to an alias of ParameterDefaultValueTuple!fn
   visible to wherever you want to mix in the results.

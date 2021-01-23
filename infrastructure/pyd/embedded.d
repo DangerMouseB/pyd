@@ -178,11 +178,11 @@ modl = context in which to run expression. must be a python module name.
 func_t = type of d function
  +/
 ReturnType!func_t py_def( string python, string modl, func_t)
-    (ParameterTypeTuple!func_t args,
+    (Parameters!func_t args,
      string file = __FILE__, size_t line = __LINE__) {
     //Note that type is really the only thing that need be static here, but hey.
         alias ReturnType!func_t R;
-        alias ParameterTypeTuple!func_t Args;
+        alias Parameters!func_t Args;
     enum afterdef = findSplit(python, "def")[2];
     enum ereparen = findSplit(afterdef, "(")[0];
     enum name = strip(ereparen) ~ "\0";

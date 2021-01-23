@@ -34,7 +34,7 @@ import pyd.func_wrap;
 import pyd.make_object;
 
 template call_ctor(T, init) {
-    alias ParameterTypeTuple!(init.Inner!T.FN) paramtypes;
+    alias Parameters!(init.Inner!T.FN) paramtypes;
     alias ParameterIdentifierTuple!(init.Inner!T.FN) paramids;
     //https://issues.dlang.org/show_bug.cgi?id=17192
     //alias ParameterDefaultValueTuple!(init.Inner!T.FN) dfs;

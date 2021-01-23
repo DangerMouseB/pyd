@@ -25,6 +25,7 @@ import deimos.python.Python;
 
 import pyd.util.typeinfo;
 import pyd.util.replace: Replace;
+import pyd.util.dg_wrapper : isImmutableFunction, isConstFunction, fn_to_dg;
 import pyd.references;
 import pyd.class_wrap;
 import pyd.exception;
@@ -84,8 +85,8 @@ template OverloadShim() {
             "$realname", realname));
     }
     int __pyd_apply_wrapper(dg_t) (dg_t dg) {
-        alias ParameterTypeTuple!(dg_t)[0] arg_t;
-        const uint args = ParameterTypeTuple!(dg_t).length;
+        alias Parameters!(dg_t)[0] arg_t;
+        const uint args = Parameters!(dg_t).length;
         PyObject* _pyobj = this.__pyd_get_pyobj();
         if (_pyobj !is null) {
             PyObject* iter = PyObject_GetIter(_pyobj);

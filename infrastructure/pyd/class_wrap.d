@@ -33,6 +33,7 @@ import std.functional;
 import std.typetuple;
 import pyd.util.typelist;
 import pyd.util.typeinfo;
+import pyd.util.dg_wrapper : dg_wrapper;
 import pyd.references;
 import pyd.ctor_wrap;
 import pyd.def;
@@ -60,8 +61,6 @@ void init_PyTypeObject(T)(ref PyTypeObject tipo) {
     tipo.tp_dealloc = &wrapped_methods!(T).wrapped_dealloc;
     tipo.tp_new = &wrapped_methods!(T).wrapped_new;
 }
-
-
 
 // The list of wrapped methods for this class.
 template wrapped_method_list(T) {
@@ -116,7 +115,7 @@ template wrapped_repr(T, alias fn) {
     static assert(constCompatible(constness!T, constness!(typeof(fn))),
             format("constness mismatch instance: %s function: %s",
                 T.stringof, typeof(fn).stringof));
-    alias dg_wrapper!(T, typeof(&fn)) get_dg;
+    alias get_dg = dg_wrapper!(T, typeof(&fn));
     /// The default repr method calls the class's toString.
     extern(C)
     PyObject* repr(PyObject* self) {
@@ -216,7 +215,7 @@ struct property_parts(alias p, string _mode) {
     static if(rmode != "") {
         alias ReturnType!(GetterFn) Type;
     }else static if(wmode != "") {
-        alias ParameterTypeTuple!(SetterFn)[0] Type;
+        alias Parameters!(SetterFn)[0] Type;
     }
 
     enum mode = rmode ~ wmode;
@@ -297,16 +296,16 @@ template _Def(alias _fn, string name, fn_t, string docstring) {
                     FunctionAttribute.trusted|
                     FunctionAttribute.safe)) == 0,
             "pyd currently does not support pure, nothrow, @trusted, or @safe member functions");
-    alias /*StripSafeTrusted!*/fn_t func_t;
+    alias func_t = fn_t;              /*StripSafeTrusted!*/
     enum realname = __traits(identifier,func);
     enum funcname = name;
     enum min_args = minArgs!(func);
     enum bool needs_shim = false;
 
     static void call(string classname, T) () {
-        alias ApplyConstness!(T, constness!(typeof(func))) cT;
+        alias cT = ApplyConstness!(T, constness!(typeof(func)));
         static PyMethodDef empty = { null, null, 0, null };
-        alias wrapped_method_list!(T) list;
+        alias list = wrapped_method_list!(T);
         list[$-1].ml_name = (name ~ "\0").ptr;
         list[$-1].ml_meth = cast(PyCFunction) &method_wrap!(cT, func, classname ~ "." ~ name).func;
         list[$-1].ml_flags = METH_VARARGS | METH_KEYWORDS;
@@ -320,8 +319,8 @@ template _Def(alias _fn, string name, fn_t, string docstring) {
         import pyd.util.replace: Replace;
         enum shim = Replace!(q{
             alias Params[$i] __pyd_p$i;
-            $override ReturnType!(__pyd_p$i.func_t) $realname(ParameterTypeTuple!(__pyd_p$i.func_t) t) $attrs {
-                return __pyd_get_overload!("$realname", __pyd_p$i.func_t).func!(ParameterTypeTuple!(__pyd_p$i.func_t))("$name", t);
+            $override ReturnType!(__pyd_p$i.func_t) $realname(Parameters!(__pyd_p$i.func_t) t) $attrs {
+                return __pyd_get_overload!("$realname", __pyd_p$i.func_t).func!(Parameters!(__pyd_p$i.func_t))("$name", t);
             }
             alias T.$realname $realname;
         }, "$i",i,"$realname",realname, "$name", name,
@@ -457,7 +456,7 @@ template _Property(alias fn, string pyname, string _mode, string docstring) {
             }
             static if(countUntil(parts.mode, "w") != -1) {
                 enum setter = Replace!(q{
-                override ReturnType!(__pyd_p$i.set_t) $realname(ParameterTypeTuple!(__pyd_p$i.set_t) t) {
+                override ReturnType!(__pyd_p$i.set_t) $realname(Parameters!(__pyd_p$i.set_t) t) {
                     return __pyd_get_overload!("$realname", __pyd_p$i.set_t).func("$name", t);
                 }
                 }, "$i", i, "$realname",realname, "$name", pyname);
@@ -474,7 +473,7 @@ template _Property(alias fn, string pyname, string _mode, string docstring) {
 }
 
 /**
-Wraps a method as the class's ___repr__ in Python.
+Wraps a method as the class's __repr__ in Python.
 
 Params:
 _fn = The property to wrap. Must have the signature string function().
@@ -519,7 +518,7 @@ struct Init(cps ...) {
         alias NewParamT!T BaseT;
         alias TypeTuple!(__traits(getOverloads, BaseT, "__ctor")) Overloads;
         template IsDesired(alias ctor) {
-            alias ParameterTypeTuple!ctor ps;
+            alias Parameters!ctor ps;
             enum bool IsDesired = is(ps == CtorParams);
         }
         alias Filter!(IsDesired, Overloads) VOverloads;
@@ -528,7 +527,7 @@ struct Init(cps ...) {
                 static if(s.length == 0) {
                     enum concatumStrings = "";
                 }else {
-                    enum concatumStrings = T.stringof ~ (ParameterTypeTuple!(s[0])).stringof ~ "\n" ~ concatumStrings!(s[1 .. $]); 
+                    enum concatumStrings = T.stringof ~ (Parameters!(s[0])).stringof ~ "\n" ~ concatumStrings!(s[1 .. $]);
                 }
             }
             alias allOverloadsString = concatumStrings!(Overloads);
@@ -537,7 +536,7 @@ struct Init(cps ...) {
                         T.stringof, CtorParams.stringof, allOverloadsString));
         }else{
             alias VOverloads[0] FN;
-            alias ParameterTypeTuple!FN Pt;
+            alias Parameters!FN Pt;
             //https://issues.dlang.org/show_bug.cgi?id=17192
             //alias ParameterDefaultValueTuple!FN Pd;
             import pyd.util.typeinfo : WorkaroundParameterDefaults;
@@ -680,7 +679,7 @@ struct BinaryOperatorX(string _op, bool isR, rhs_t) {
                 pragma(msg, "getted here 1");
                 pragma(msg, C.stringof);
             }
-            alias ParameterTypeTuple!(typeof(mixin(fn_str1)))[0] RHS_T;
+            alias Parameters!(typeof(mixin(fn_str1)))[0] RHS_T;
             alias ReturnType!(typeof(mixin(fn_str1))) RET_T;
             mixin("alias " ~ fn_str1 ~ " FN;");
             static if(!is(rhs_t == Guess))
@@ -803,7 +802,7 @@ struct OpAssign(string _op, rhs_t = Guess) if(IsPyAsg(_op)) {
             static assert(0, C.stringof ~ " has no operator assignment overloads");
         }
         static if(is(typeof(C.init.opOpAssign!(_op)) == function)) {
-            alias ParameterTypeTuple!(typeof(C.opOpAssign!(_op)))[0] RHS_T;
+            alias Parameters!(typeof(C.opOpAssign!(_op)))[0] RHS_T;
             alias ReturnType!(typeof(C.opOpAssign!(_op))) RET_T;
             alias C.opOpAssign!(_op) FN;
             static if(!is(rhs_t == Guess))
@@ -867,15 +866,15 @@ struct OpCompare(_rhs_t = Guess) {
             static assert(0, format("Cannot choose between %s", Overloads));
         }else static if(Overloads.length == 1) {
             static if(!is(rhs_t == Guess) &&
-                !is(ParameterTypeTuple!(Overloads[0])[0] == rhs_t)) {
+                !is(Parameters!(Overloads[0])[0] == rhs_t)) {
                 static assert(0, format("%s.opCmp: expected param %s, got %s",
-                            C, rhs_t, ParameterTypeTuple!(Overloads[0])));
+                            C, rhs_t, Parameters!(Overloads[0])));
             }else{
                 alias Overloads[0] FN;
             }
         }else{
             template IsDesiredOverload(alias fn) {
-                enum bool IsDesiredOverload = is(ParameterTypeTuple!(fn)[0] == rhs_t);
+                enum bool IsDesiredOverload = is(Parameters!(fn)[0] == rhs_t);
             }
             alias Filter!(IsDesiredOverload, Overloads) Overloads1;
             static assert(Overloads1.length == 1,
@@ -919,7 +918,7 @@ struct OpIndex(index_t...) {
                 alias Overloads[0] FN;
             }else{
                 template IsDesiredOverload(alias fn) {
-                    enum bool IsDesiredOverload = is(ParameterTypeTuple!fn == index_t);
+                    enum bool IsDesiredOverload = is(Parameters!fn == index_t);
                 }
                 alias Filter!(IsDesiredOverload, Overloads) Overloads1;
                 static assert(Overloads1.length == 1,
@@ -962,7 +961,7 @@ struct OpIndexAssign(index_t...) {
         static if(is(typeof(C.init.opIndex) == function)) {
             alias TypeTuple!(__traits(getOverloads, C, "opIndexAssign")) Overloads;
             template IsValidOverload(alias fn) {
-                enum bool IsValidOverload = ParameterTypeTuple!fn.length >= 2;
+                enum bool IsValidOverload = Parameters!fn.length >= 2;
             }
             alias Filter!(IsValidOverload, Overloads) VOverloads;
             static if(VOverloads.length == 0 && Overloads.length != 0)
@@ -976,7 +975,7 @@ struct OpIndexAssign(index_t...) {
                 alias VOverloads[0] FN;
             }else{
                 template IsDesiredOverload(alias fn) {
-                    enum bool IsDesiredOverload = is(ParameterTypeTuple!fn == index_t);
+                    enum bool IsDesiredOverload = is(Parameters!fn == index_t);
                 }
                 alias Filter!(IsDesiredOverload, VOverloads) Overloads1;
                 static assert(Overloads1.length == 1,
@@ -1025,7 +1024,7 @@ struct OpSlice() {
         static if(is(typeof(C.init.opSlice) == function)) {
             alias TypeTuple!(__traits(getOverloads, C, "opSlice")) Overloads;
             template IsDesiredOverload(alias fn) {
-                enum bool IsDesiredOverload = is(ParameterTypeTuple!fn ==
+                enum bool IsDesiredOverload = is(Parameters!fn ==
                         TypeTuple!(Py_ssize_t,Py_ssize_t));
             }
             alias Filter!(IsDesiredOverload, Overloads) Overloads1;
@@ -1073,7 +1072,7 @@ struct OpSliceAssign(rhs_t = Guess) {
         static if(is(typeof(C.init.opSliceAssign) == function)) {
             alias TypeTuple!(__traits(getOverloads, C, "opSliceAssign")) Overloads;
             template IsDesiredOverload(alias fn) {
-                alias ParameterTypeTuple!fn ps;
+                alias Parameters!fn ps;
                 enum bool IsDesiredOverload =
                     is(ps[1..3] == TypeTuple!(Py_ssize_t,Py_ssize_t));
             }
@@ -1088,7 +1087,7 @@ struct OpSliceAssign(rhs_t = Guess) {
                 alias Overloads1[0] FN;
             }else{
                 template IsDesiredOverload2(alias fn) {
-                    alias ParameterTypeTuple!fn ps;
+                    alias Parameters!fn ps;
                     enum bool IsDesiredOverload2 = is(ps[0] == rhs_t);
                 }
                 alias Filter!(IsDesiredOverload2, Overloads1) Overloads2;
@@ -1183,7 +1182,7 @@ struct _Len(fnt...) {
         }
         alias TypeTuple!(__traits(getOverloads, T, nom)) Overloads;
         template IsDesiredOverload(alias fn) {
-            alias ParameterTypeTuple!fn ps;
+            alias Parameters!fn ps;
             alias ReturnType!fn rt;
             enum bool IsDesiredOverload = isImplicitlyConvertible!(rt,Py_ssize_t) && ps.length == 0;
         }
@@ -1212,7 +1211,7 @@ struct _Len(fnt...) {
 
 
 template param1(C) {
-    template param1(T) {alias ParameterTypeTuple!(T.Inner!C .FN)[0] param1; }
+    template param1(T) {alias Parameters!(T.Inner!C .FN)[0] param1; }
 }
 
 enum IsOp(A) = __traits(hasMember, A, "op");

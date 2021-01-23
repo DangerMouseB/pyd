@@ -83,7 +83,7 @@ void init_rangewrapper() {
 bool rangeWrapperInited = false;
 
 class to_conversion_wrapper(dg_t) {
-    alias ParameterTypeTuple!(dg_t)[0] T;
+    alias Parameters!(dg_t)[0] T;
     alias ReturnType!(dg_t) Intermediate;
     dg_t dg;
     this(dg_t fn) { dg = fn; }
@@ -96,7 +96,7 @@ class to_conversion_wrapper(dg_t) {
     }
 }
 class from_conversion_wrapper(dg_t) {
-    alias ParameterTypeTuple!(dg_t)[0] Intermediate;
+    alias Parameters!(dg_t)[0] Intermediate;
     alias ReturnType!(dg_t) T;
     dg_t dg;
     this(dg_t fn) { dg = fn; }
@@ -126,7 +126,7 @@ type convertible by d_to_python.
 */
 void ex_d_to_python(dg_t) (dg_t dg) {
     static if (is(dg_t == delegate) && is(ReturnType!(dg_t) == PyObject*)) {
-        to_converter_registry!(ParameterTypeTuple!(dg_t)[0]).dg = dg;
+        to_converter_registry!(Parameters!(dg_t)[0]).dg = dg;
     } else {
         auto o = new to_conversion_wrapper!(dg_t)(dg);
         to_converter_registry!(typeof(o).T).dg = &o.opCall;
@@ -142,7 +142,7 @@ dg = A callable which takes a PyObject*, or any type convertible by python_to_d,
     and returns a D type.
 */
 void ex_python_to_d(dg_t) (dg_t dg) {
-    static if (is(dg_t == delegate) && is(ParameterTypeTuple!(dg_t)[0] == PyObject*)) {
+    static if (is(dg_t == delegate) && is(Parameters!(dg_t)[0] == PyObject*)) {
         from_converter_registry!(ReturnType!(dg_t)).dg = dg;
     } else {
         auto o = new from_conversion_wrapper!(dg_t)(dg);
@@ -1151,8 +1151,7 @@ auto wrap_range(Range)(Range range) if(is(Range == struct)) {
     wrap.tid = typeid(Range);
     wrap.empty = dg_wrapper(keeper, &Range.empty);
     wrap.popFront = dg_wrapper(keeper, &Range.popFront);
-    auto front_dg =
-        dg_wrapper(keeper, cast(ElementType!Range function()) &Range.front);
+    auto front_dg = dg_wrapper(keeper, cast(ElementType!Range function()) &Range.front);
     wrap.front = delegate PyObject*() {
         return d_to_python(front_dg());
     };

@@ -83,7 +83,7 @@ struct DFn_Py_Mapping {
                 "Pyd cannot handle ref or out parameters at this time");
         this.d = DKey(d);
         this.d_typeinfo = typeid(TypeInfoType!Fn);
-        this.params_info = (cast(TypeInfo_Tuple) typeid(ParameterTypeTuple!Fn))
+        this.params_info = (cast(TypeInfo_Tuple) typeid(Parameters!Fn))
             .elements;
         this.py = py;
         this.functionAttributes = .functionAttributes!Fn;
@@ -121,7 +121,7 @@ struct DDg_Py_Mapping {
                 "Pyd cannot handle ref or out parameters at this time");
         this.d = DKey(d);
         this.d_typeinfo = typeid(TypeInfoType!Dg);
-        this.params_info = (cast(TypeInfo_Tuple) typeid(ParameterTypeTuple!Dg))
+        this.params_info = (cast(TypeInfo_Tuple) typeid(Parameters!Dg))
             .elements;
         this.py = py;
         this.functionAttributes = .functionAttributes!Dg;

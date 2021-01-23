@@ -242,12 +242,12 @@ template IsEponymousTemplateFunction(alias fn) {
 }
 
 template alias_selector(alias fn, fn_t) {
-    alias ParameterTypeTuple!fn_t ps;
+    alias Parameters!fn_t ps;
     alias ReturnType!fn_t ret;
     alias TypeTuple!(__traits(parent, fn))[0] Parent;
     enum nom = __traits(identifier, fn);
     template IsDesired(alias f) {
-        alias ParameterTypeTuple!f fps;
+        alias Parameters!f fps;
         alias ReturnType!f fret;
         enum bool IsDesired = is(ps == fps) && is(fret == ret);
     }

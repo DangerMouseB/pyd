@@ -5020,7 +5020,7 @@ if(IndexedByCount!(Args)() == 1 &&
         static if(i < IndexedBy.Indices.length){
             static if(i != N){
                 import std.traits;
-                static if(ParameterTypeTuple!(index!i._Insert).length == 2){
+                static if(Parameters!(index!i._Insert).length == 2){
                     enum result = Replace!(q{
                         index!(Y)._Insert(node,aY);
                     }, "Y", i) ~ ForEachDoInsert!(i+1,N).result;
