@@ -1,6 +1,8 @@
+module ut.pyd.func_wrap;
+ 
 
 import pyd.pyd, pyd.embedded;
-import pyd.func_wrap;
+import pyd.reboot._dispatch_utils : supportsNArgs;
 import core.vararg;
 
 void foo0() {
@@ -103,11 +105,4 @@ unittest {
     assert(supportsNArgs!(Foo5.__ctor)(3));
     assert(supportsNArgs!(Foo5.__ctor)(4));
     assert(!supportsNArgs!(Foo5.__ctor)(5));
-}
-
-import std.stdio;
-enum string msg = import("important_message.txt");
-
-void main() {
-    writeln(msg);
 }

@@ -1,78 +1,83 @@
+module ut.pyd.class_wrap;
+
 import pyd.pyd, pyd.embedded;
 import deimos.python.pyport: Py_ssize_t;
 import std.exception;
 import std.stdio;
 
 shared static this() {
-    on_py_init({
-    add_module!(ModuleName!"testing")();
-    });
-    py_init();
-    on_py_init({
-    wrap_class!(Bizzy,
-            ModuleName!"testing",
-            //Init!(int[]),
-            Init!(int,double,string),
-            Def!(Bizzy.a, int function(double)),
-            StaticDef!(Bizzy.b, int function(double)),
-            Repr!(Bizzy.repr),
-            Property!(Bizzy.m, Mode!"r"),
-            OpBinary!("+"),
-            OpBinary!("*"),
-            OpBinary!("/"),
-            OpBinary!("^^"),
-            OpBinaryRight!("in"),
-            OpBinaryRight!("+"),
-            OpUnary!("+"),
-            OpUnary!("~"),
-            OpAssign!("+"),
-            OpAssign!("%"),
-            OpAssign!("^^"),
-            OpIndex!(),
-            OpIndexAssign!(),
-            OpCompare!(),
-            OpSlice!(),
-            OpSliceAssign!(),
-            OpCall!(double),
-            Len!(Bizzy.pylen),
-    )();
-    wrap_class!(Bizzy2,
-            ModuleName!"testing",
-            Init!(int[]),
-            StaticDef!(Bizzy2.a),
-            StaticDef!(Bizzy2.b),
-            StaticDef!(Bizzy2.c),
-            StaticDef!(Bizzy2.d),
-            Def!(Bizzy2.jj),
-    )();
-    wrap_class!(Bizzy3,
-            ModuleName!"testing",
-            Init!(int,int),
-            Def!(Bizzy3.a),
-            Def!(Bizzy3.b),
-            Def!(Bizzy3.c),
-            Def!(Bizzy3.d),
-    )();
-    wrap_class!(Bizzy4,
-            ModuleName!"testing",
-            Property!(Bizzy4.i),
-            Repr!(Bizzy4.repr),
-            Def!(Bizzy4.foo),
-            Len!(),
-    )();
-    wrap_class!(Bizzy5,
-            ModuleName!"testing",
-            Init!(int,double,string),
-            Def!(Bizzy5.a),
-            Property!(Bizzy5.b, Mode!"r"),
-            Property!(Bizzy5.c, Mode!"rw"),
-            Property!(Bizzy5.e, Mode!"w"),
-    )();
-    wrap_class!(TBizzy,
-            ModuleName!"testing",
-            Def!(TBizzy.f),
-    )();
-    }, PyInitOrdering.After);
+    if (!py_init_called) {
+        on_py_init({add_module!(ModuleName!"testing")();});
+        py_init();
+    }
+    on_py_init(
+        {
+            wrap_class!(Bizzy,
+                ModuleName!"testing",
+                //Init!(int[]),
+                Init!(int,double,string),
+                Def!(Bizzy.a, int function(double)),
+                StaticDef!(Bizzy.b, int function(double)),
+                Repr!(Bizzy.repr),
+                Property!(Bizzy.m, Mode!"r"),
+                OpBinary!("+"),
+                OpBinary!("*"),
+                OpBinary!("/"),
+                OpBinary!("^^"),
+                OpBinaryRight!("in"),
+                OpBinaryRight!("+"),
+                OpUnary!("+"),
+                OpUnary!("~"),
+                OpAssign!("+"),
+                OpAssign!("%"),
+                OpAssign!("^^"),
+                OpIndex!(),
+                OpIndexAssign!(),
+                OpCompare!(),
+                OpSlice!(),
+                OpSliceAssign!(),
+                OpCall!(double),
+                Len!(Bizzy.pylen),
+            )();
+            wrap_class!(Bizzy2,
+                ModuleName!"testing",
+                Init!(int[]),
+                StaticDef!(Bizzy2.a),
+                StaticDef!(Bizzy2.b),
+                StaticDef!(Bizzy2.c),
+                StaticDef!(Bizzy2.d),
+                Def!(Bizzy2.jj),
+            )();
+            wrap_class!(Bizzy3,
+                ModuleName!"testing",
+                Init!(int,int),
+                Def!(Bizzy3.a),
+                Def!(Bizzy3.b),
+                Def!(Bizzy3.c),
+                Def!(Bizzy3.d),
+            )();
+            wrap_class!(Bizzy4,
+                ModuleName!"testing",
+                Property!(Bizzy4.i),
+                Repr!(Bizzy4.repr),
+                Def!(Bizzy4.foo),
+                Len!(),
+            )();
+            wrap_class!(Bizzy5,
+                ModuleName!"testing",
+                Init!(int,double,string),
+                Def!(Bizzy5.a),
+                Property!(Bizzy5.b, Mode!"r"),
+                Property!(Bizzy5.c, Mode!"rw"),
+                Property!(Bizzy5.e, Mode!"w"),
+            )();
+            wrap_class!(TBizzy,
+                ModuleName!"testing",
+                Def!(TBizzy.f),
+            )();
+        },
+        PyInitOrdering.After
+    );
 
 }
 
@@ -349,5 +354,3 @@ unittest {
     assert(c.py_eval!string("boozy.a()") == "<1, 1, 'ten'>");
 
 }
-
-void main() {}

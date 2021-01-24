@@ -1,20 +1,30 @@
-import pyd.pyd, pyd.embedded;
+module ut.pyd.make_object;
+
+
+
+import std.stdio;
+import std.typecons;
+import std.string;
 import std.traits;
 import std.functional;
 import std.range;
 import std.algorithm;
 import std.exception;
 import std.datetime;
+
 import deimos.python.Python;
-import std.stdio;
-import std.typecons;
-import std.string;
+
+import pyd.pyd;
+import pyd.pydobject;
+import pyd.embedded;
+import pyd.reboot.common : RebootFullTrace;
+
 
 static this() {
-    on_py_init({
-    add_module!(ModuleName!"testing")();
-    });
-    py_init();
+    if (!py_init_called) {
+        on_py_init({add_module!(ModuleName!"testing")();});
+        py_init();
+    }
 }
 
 auto cantconvert(E)(lazy E e) {
@@ -661,5 +671,3 @@ unittest {
     assert(context.fo.to_d!double() == 1.0);
     assert(context.zo.to_d!double() == 1.0);
 }
-
-void main() {}

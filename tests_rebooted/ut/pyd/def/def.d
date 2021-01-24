@@ -1,3 +1,5 @@
+module ut.pyd.def;
+
 import pyd.pyd, pyd.embedded;
 import pyd.pyd: def;
 import std.string;
@@ -35,16 +37,16 @@ template t2(T) {
 }
 
 static this() {
-    def!(a,int function(double), ModuleName!"testing")();
+    def!(a, int function(double), ModuleName!"testing")();
     def!(a2, int function(int,double,), ModuleName!"testing")();
     def!(a3, int function(int[]), ModuleName!"testing")();
     def!(a4, ModuleName!"testing")();
     def!(t1!int, PyName!"t1", ModuleName!"testing")();
     def!(t2!int.f, PyName!"t2", ModuleName!"testing")();
-    on_py_init({
-            add_module!(ModuleName!"testing")();
-    });
-    py_init();
+    if (!py_init_called) {
+        on_py_init({add_module!(ModuleName!"testing")();});
+        py_init();
+    }
 }
 
 unittest{
@@ -64,5 +66,3 @@ unittest{
 
 
 }
-
-void main() {}

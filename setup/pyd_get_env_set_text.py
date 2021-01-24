@@ -18,7 +18,9 @@ if os.name == 'nt':
 else:
     set_prefix = 'export'
 
-for i in range(13):
+
+print(versionNumbers)
+for i in range(14):
 	if i < len(versionNumbers):
 		v = "Python_{}_Or_Later".format(versionNumbers[i])
 	else:

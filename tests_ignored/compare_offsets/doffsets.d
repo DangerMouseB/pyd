@@ -1,5 +1,5 @@
 // A minimal "hello world" Pyd module.
-module hello;
+module doffsets;
 
 import pyd.pyd;
 import std.stdio;
