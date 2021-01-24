@@ -31,8 +31,6 @@ SOFTWARE.
  +/
 module pyd.make_object;
 
-import deimos.python.Python;
-
 import std.array;
 import std.algorithm;
 import std.complex;
@@ -45,13 +43,20 @@ import std.conv;
 import std.range;
 import std.stdio;
 
-import pyd.references;
-import pyd.pydobject;
-import pyd.class_wrap;
-import pyd.struct_wrap;
-import pyd.func_wrap;
-import pyd.def;
-import pyd.exception;
+import deimos.python.Python;
+//import deimos.python.Python : PyObject, PyTypeObject, Py_ssize_t;
+//import deimos.python.object : PyObject_VAR_HEAD, PyVarObject, Py_INCREF, Py_DECREF;
+//import deimos.python.dictobject : PyDict_New, PyDict_SetItem, PyDict_New;
+//import deimos.python.unicodeobject : PyUnicode_DecodeUTF8;
+
+import pyd.references: is_wrapped, PydTypeObject, get_d_reference, wrap_d_object;
+import pyd.pydobject : PydObject, PydInputRange;
+import pyd.class_wrap : Def, wrapped_classes;
+import pyd.struct_wrap : wrap_struct;
+import pyd.func_wrap : PydWrappedFunc_Ready;
+import pyd.def : on_py_init, PyName, PyInitOrdering, add_module, ModuleName;
+import pyd.exception : handle_exception;
+import pyd.util.dg_wrapper : dg_wrapper;
 
 
 shared static this() {
@@ -61,9 +66,9 @@ shared static this() {
 void init_rangewrapper() {
     version(PydPythonExtension) {
         on_py_init({
-            wrap_struct!(RangeWrapper,
-                Def!(RangeWrapper.iter, PyName!"__iter__"),
-                Def!(RangeWrapper.next))();
+            wrap_struct!(InputRangeWrapper,
+                Def!(InputRangeWrapper.iter, PyName!"__iter__"),
+                Def!(InputRangeWrapper.next))();
             rangeWrapperInited = true;
             }, PyInitOrdering.After);
     }else{
@@ -71,10 +76,10 @@ void init_rangewrapper() {
             add_module!(ModuleName!"pyd")();
             });
     on_py_init( {
-            wrap_struct!(RangeWrapper,
+            wrap_struct!(InputRangeWrapper,
                 ModuleName!"pyd",
-                Def!(RangeWrapper.iter, PyName!"__iter__"),
-                Def!(RangeWrapper.next))();
+                Def!(InputRangeWrapper.iter, PyName!"__iter__"),
+                Def!(InputRangeWrapper.next))();
             rangeWrapperInited = true;
             }, PyInitOrdering.After);
     }
@@ -234,15 +239,16 @@ PyObject* d_to_python(T) (T t) {
         // If it's not a wrapped type, fall through to the exception.
     // If converting a struct by value, create a copy and wrap that
     } else static if (is(T == struct) &&
-            !is(T == RangeWrapper) &&
+            !is(T == InputRangeWrapper) &&
             isInputRange!T) {
         if (to_converter_registry!(T).dg) {
             return d_to_python_try_extends(t);
-        } else static if(AlwaysTry || __traits(compiles, wrap_range(t))) {
-            assert(is_wrapped!(RangeWrapper*));
+        } else static if(__traits(compiles, wrap_range(t))) {
+            assert(is_wrapped!(InputRangeWrapper*));
             return d_to_python(wrap_range(t));
         } else {
             pragma(msg, "Didn't compile - pyd.make_object.d_to_python");
+            wrap_range(t);
         }
     } else static if (is(T == struct)) {
         alias Unqual!T Tu;
@@ -280,7 +286,7 @@ PyObject* d_tuple_to_python(T) (T t) if (isTuple!T) {
     foreach(i, _t; T.Types) {
         tuple[i] = t[i];
     }
-    return PyTuple_FromItems(tuple);
+    return items_to_PyTuple(tuple);
 }
 
 PyObject* d_bigint_to_python(BigInt t) {
@@ -377,7 +383,7 @@ T python_to_aarray(T)(PyObject* py) if(isAssociativeArray!T) {
 /**
  * Helper function for creating a PyTuple from a series of D items.
  */
-PyObject* PyTuple_FromItems(T ...)(T t) {
+PyObject* items_to_PyTuple(T ...)(T t) {
     PyObject* tuple = PyTuple_New(t.length);
     PyObject* temp;
     if (tuple is null) return null;
@@ -566,8 +572,8 @@ T python_to_d(T) (PyObject* o) {
         }
         // or struct is wrapped range
         if(PyObject_IsInstance(o,
-                    cast(PyObject*)&PydTypeObject!(RangeWrapper*))) {
-            RangeWrapper* wrapper = get_d_reference!(RangeWrapper*)(o);
+                    cast(PyObject*)&PydTypeObject!(InputRangeWrapper*))) {
+            InputRangeWrapper* wrapper = get_d_reference!(InputRangeWrapper*)(o);
             if(typeid(T) != wrapper.tid) {
                 could_not_convert!T(o, format("typeid mismatch: %s vs %s",
                             wrapper.tid, typeid(T)));
@@ -856,7 +862,8 @@ if(isArray!T || IsStaticArrayPointer!T) {
 PyObject* d_to_python_array_array(T)(T t)
 if((isArray!T || IsStaticArrayPointer!T) &&
         MatrixInfo!T.ndim == 1 &&
-        SimpleFormatType!(MatrixInfo!T.MatrixElementType).supported) {
+        SimpleFormatType!(MatrixInfo!T.MatrixElementType).supported)
+{
     import core.stdc.string : memcpy;
 
     alias MatrixInfo!T.MatrixElementType ME;
@@ -880,17 +887,10 @@ if((isArray!T || IsStaticArrayPointer!T) &&
     return obj;
 }
 
-/**
-  Convert a D object to python bytes (str, in python 2).
-*/
 PyObject* d_to_python_bytes(T)(T t) if(is(T == string)) {
     return PyBytes_FromStringAndSize(t.ptr, cast(Py_ssize_t) t.length);
 }
 
-/** Convert an iterable Python object to a D object.
-  *
-  * Used by python_to_d.
-  */
 T python_iter_to_d(T)(PyObject* o) if(isArray!T || IsStaticArrayPointer!T) {
     import std.string: format;
 
@@ -1143,9 +1143,9 @@ if (isArray!T || IsStaticArrayPointer!T) {
   Does not work for UFCS ranges (e.g. arrays), classes
   */
 auto wrap_range(Range)(Range range) if(is(Range == struct)) {
-    static assert(!is(Range == RangeWrapper));
+    static assert(!is(Range == InputRangeWrapper));
     import core.memory;
-    RangeWrapper wrap;
+    InputRangeWrapper wrap;
     // the hackery! the hackery!
     Range* keeper = cast(Range*) GC.calloc(Range.sizeof);
     std.algorithm.move(range, *keeper);
@@ -1161,18 +1161,18 @@ auto wrap_range(Range)(Range range) if(is(Range == struct)) {
 }
 
 /**
-  Wrapper type wrapping a D input range as a python iterator object
+  Wraps D input range as a python iterator object
 
   Lives in reserved python module "pyd".
   */
-struct RangeWrapper {
+struct InputRangeWrapper {
     void* range;
     void delegate() popFront;
     PyObject* delegate() front;
     bool delegate() empty;
     TypeInfo tid;
 
-    RangeWrapper* iter() {
+    InputRangeWrapper* iter() {
         return &this;
     }
     PyObject* next() {
@@ -1543,7 +1543,7 @@ void could_not_convert(T) (PyObject* o, string reason = "",
 // stuff this down here until we can figure out what to do with it.
 // Python-header-file: Modules/arraymodule.c:
 
-struct arraydescr{
+struct arraydescr {
     int typecode;
     int itemsize;
     PyObject* function(arrayobject*, Py_ssize_t) getitem;
@@ -1589,7 +1589,7 @@ bool is_numpy_datetime64(PyObject* py) {
 
 T python_to_d_numpy_datetime64(T)(PyObject* py) {
     PyObject* astype = PyObject_GetAttrString(py, "astype");
-    PyObject* args = PyTuple_FromItems(cast(PyObject*) datetime_datetime);
+    PyObject* args = items_to_PyTuple(cast(PyObject*) datetime_datetime);
     scope(exit) Py_DECREF(args);
     PyObject* datetime = PyObject_CallObject(astype, args);
     scope(exit) Py_DECREF(datetime);
