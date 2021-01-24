@@ -38,3 +38,9 @@ mixin(Replace!(q{
 ```
 
 
+#### WISHLIST
+
+1. any vulnerabilities get discovered by PyCharm in the variable inspector in debug mode - be able to prevent this
+2. structs in pyd don't have full support requirng wrapper classes in D
+
+

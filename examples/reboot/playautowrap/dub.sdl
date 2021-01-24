@@ -1,0 +1,33 @@
+name "play"
+description "Testing autowrap, pyd and d2py"
+authors "David Briant"
+copyright "Copyright © 2021, David Briant"
+targetType "dynamicLibrary"
+
+
+# To choose a configuration, use dub --config=<name>. By default, the first configuration
+# that matches the target type and build platform is selected automatically.
+
+#configuration "pyd" {
+##    dependency "autowrap:python" version="~>0.6.3"
+#    dependency "autowrap:python" path="/Users/david/repos/github/symmetryinvestments/autowrap"
+#    dependency "pyd" path="/Users/david/repos/github/ariovistus/pyd"
+#    platforms "osx"
+#    subConfiguration "autowrap:python" "env"             # the python38 configuration doesn't work for me
+#}
+
+
+configuration "pynih" {
+    lflags "-L$PYTHON_LIB_DIR"
+    dependency "autowrap:pynih" version="~>0.6.3"
+#    dependency "autowrap:pynih" path="/Users/david/repos/github/symmetryinvestments/autowrap"
+    platforms "osx"
+}
+
+
+buildType "debug" {
+    postBuildCommands "if [ -f libplay.dylib ]; then  mv libplay.dylib play.so; fi" platform="osx"
+    preBuildCommands "if [ -f libplay.dylib ]; then rm -f libplay.dylib; fi" platform="osx"
+    preBuildCommands "if [ -f play.so ]; then rm -f play.so; fi" platform="osx"
+}
+
