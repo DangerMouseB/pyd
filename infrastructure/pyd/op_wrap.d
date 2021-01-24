@@ -19,22 +19,27 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-module pyd.op_wrap;
 
-import deimos.python.Python;
+module pyd.op_wrap;
 
 import std.algorithm: startsWith, endsWith;
 import std.traits;
 import std.exception: enforce;
 import std.string: format;
 import std.conv: to;
-import pyd.util.typeinfo;
 
+import deimos.python.Python;
+import pyd.util.typeinfo;
+import pyd.util.dg_wrapper;
 import pyd.references;
 import pyd.class_wrap;
-import pyd.func_wrap;
 import pyd.exception;
 import pyd.make_object;
+
+import pyd.reboot.common : RebootFullTrace;
+import pyd.reboot._dispatch : memberfunc_to_func, method_dgwrap, applyFnDelegateToArgs;
+
+
 
 // wrap a binary operator overload, handling __op__, __rop__, or
 // __op__ and __rop__ as necessary.
@@ -42,21 +47,21 @@ import pyd.make_object;
 // _lop.C is a tuple w length 0 or 1 containing a BinaryOperatorX instance.
 // same for _rop.C.
 template binop_wrap(T, _lop, _rop) {
-    alias _lop.C lop;
-    alias _rop.C rop;
-    alias PydTypeObject!T wtype;
+    alias lop = _lop.C;
+    alias rop = _rop.C;
+    alias wtype = PydTypeObject!T;
     static if(lop.length) {
         alias lop[0] lop0;
         alias lop0.Inner!T.FN lfn;
-        alias dg_wrapper!(T, typeof(&lfn)) get_dgl;
-        alias ParameterTypeTuple!(lfn)[0] LOtherT;
+        alias get_dgl = dg_wrapper!(T, typeof(&lfn));
+        alias Parameters!(lfn)[0] LOtherT;
         alias ReturnType!(lfn) LRet;
     }
     static if(rop.length) {
         alias rop[0] rop0;
         alias rop0.Inner!T.FN rfn;
         alias dg_wrapper!(T, typeof(&rfn)) get_dgr;
-        alias ParameterTypeTuple!(rfn)[0] ROtherT;
+        alias Parameters!(rfn)[0] ROtherT;
         alias ReturnType!(rfn) RRet;
     }
     enum mode = (lop.length?"l":"")~(rop.length?"r":"");
@@ -129,7 +134,7 @@ template binopasg_wrap(T, alias fn) {
 
 // pow is special. its stupid slot is a ternary function.
 template powop_wrap(T, _lop, _rop) {
-    alias _lop.C lop;
+    alias lop = _lop.C;
     alias _rop.C rop;
     alias PydTypeObject!T wtype;
     static if(lop.length) {
@@ -158,7 +163,7 @@ template powop_wrap(T, _lop, _rop) {
                     }else if(PyObject_IsInstance(o2, cast(PyObject*)&wtype)) {
                         goto rop;
                     }else{
-                        pragma(msg, "DB HERE");
+                        static if(RebootFullTrace) pragma(msg, "DB HERE");
                         enforce(false, format(
                             "unsupported operand type(s) for %s: '%s' and '%s'",
                             opl.op, o1.ob_type.tp_name, o2.ob_type.tp_name,
@@ -208,14 +213,19 @@ template powopasg_wrap(T, alias fn) {
 }
 
 template opcall_wrap(T, alias fn) {
+    // DBHERE
+    import pyd.reboot.attributes : signatureWithAttributes;
+    static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #1");
     static assert(constCompatible(constness!T, constness!(typeof(fn))),
             format("constness mismatch instance: %s function: %s",
                 T.stringof, typeof(fn).stringof));
-    alias PydTypeObject!T wtype;
-    alias dg_wrapper!(T, typeof(&fn)) get_dg;
-    alias ParameterTypeTuple!(fn)[0] OtherT;
-    alias ReturnType!(fn) Ret;
+    alias wtype = PydTypeObject!T;
+    alias get_dg = dg_wrapper!(T, typeof(&fn));
+    alias OtherT = Parameters!(fn)[0];
+    alias Ret = ReturnType!(fn);
 
+    static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #2");
+    @(__traits(getAttributes, fn))
     extern(C)
     PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
         return exception_catcher(delegate PyObject*() {
@@ -230,9 +240,12 @@ template opcall_wrap(T, alias fn) {
                 return null;
             }
             auto dg = get_dg(instance, &fn);
-            return pyApplyToDelegate(dg, args);
+            pragma(msg, "pyd.op_wrap.opcall_wrap.func.exception_catcher #4");
+            return applyFnDelegateToArgs(dg, args);   // DBHERE add kwargs
         });
     }
+    static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #3 fn -  "~signatureWithAttributes!fn);
+    static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #3 func -  "~signatureWithAttributes!func);
 }
 
 //----------------//

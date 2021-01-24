@@ -20,33 +20,41 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-/**
-  Contains utilities for wrapping D classes.
-*/
+
 module pyd.class_wrap;
 
-import deimos.python.Python;
 
 import std.traits;
 import std.conv;
 import std.functional;
 import std.typetuple;
+
+import deimos.python.Python;
 import pyd.util.typelist;
-import pyd.util.typeinfo;
+import pyd.util.typeinfo : attrs_to_string, ApplyConstness, constness, NewParamT, constCompatible, tattrs_to_string;
 import pyd.util.dg_wrapper : dg_wrapper;
+
 import pyd.references;
 import pyd.ctor_wrap;
 import pyd.def;
-import pyd.exception;
+import pyd.exception : exception_catcher, exception_catcher_nogc;
 import pyd.func_wrap;
 import pyd.make_object;
 import pyd.make_wrapper;
 import pyd.op_wrap;
 import pyd.struct_wrap;
 
+import pyd.reboot._dispatch : method_wrap;
+import pyd.reboot._dispatch_utils : minArgs;
+import pyd.reboot.common : RebootFullTrace;
+
+
+
 version(Pyd_with_StackThreads) static assert(0, "sorry - stackthreads are gone");
 
+
 PyTypeObject*[ClassInfo] wrapped_classes;
+
 template shim_class(T) {
     PyTypeObject* shim_class;
 }
@@ -62,25 +70,24 @@ void init_PyTypeObject(T)(ref PyTypeObject tipo) {
     tipo.tp_new = &wrapped_methods!(T).wrapped_new;
 }
 
-// The list of wrapped methods for this class.
 template wrapped_method_list(T) {
     PyMethodDef[] wrapped_method_list = [
         { null, null, 0, null }
     ];
 }
 
-// The list of wrapped properties for this class.
 template wrapped_prop_list(T) {
     static PyGetSetDef[] wrapped_prop_list = [
         { null, null, null, null, null }
     ];
 }
 
+
+
 //-///////////////////
 // STANDARD METHODS //
 //-///////////////////
 
-// Various wrapped methods
 template wrapped_methods(T) {
     /// The generic "__new__" method
     extern(C)
@@ -295,28 +302,76 @@ pyname: The name of the function as it will appear in Python. Defaults to
 fn's name in D
 docstring: The function's docstring. Defaults to "".
 */
+//struct Def(alias fn, Options...) {
+//    alias args = Args!("","", __traits(identifier,fn), "",Options);
+//    static if(args.rem.length) {
+//        alias fn_t = args.rem[0];
+//    }else {
+//        alias fn_t = typeof(&fn);
+//    }
+//    mixin _Def!(fn, args.pyname, fn_t, args.docstring);
+//}
+//template _Def(alias _fn, string name, fn_t, string docstring) {
+//    alias func = def_selector!(_fn,fn_t).FN;
+//    static assert(!__traits(isStaticFunction, func)); // TODO
+//    static assert((functionAttributes!fn_t & (
+//                    FunctionAttribute.nothrow_|
+//                    FunctionAttribute.pure_|
+//                    FunctionAttribute.trusted|
+//                    FunctionAttribute.safe)) == 0,
+//            "pyd currently does not support pure, nothrow, @trusted, or @safe member functions");
+//    alias func_t = fn_t;              /*StripSafeTrusted!*/
+//    enum realname = __traits(identifier,func);
+//    enum funcname = name;
+//    enum min_args = minArgs!(func);
+//    enum bool needs_shim = false;
+//
+//    static void call(string classname, T) () {
+//        alias cT = ApplyConstness!(T, constness!(typeof(func)));
+//        static PyMethodDef empty = { null, null, 0, null };
+//        alias list = wrapped_method_list!(T);
+//        list[$-1].ml_name = (name ~ "\0").ptr;
+//        list[$-1].ml_meth = cast(PyCFunction) &method_wrap!(cT, func, classname ~ "." ~ name).func;
+//        list[$-1].ml_flags = METH_VARARGS | METH_KEYWORDS;
+//        list[$-1].ml_doc = (docstring~"\0").ptr;
+//        list ~= empty;
+//        // It's possible that appending the empty item invalidated the
+//        // pointer in the type struct, so we renew it here.
+//        PydTypeObject!(T).tp_methods = list.ptr;
+//    }
+//    template shim(size_t i, T) {
+//        import pyd.util.replace: Replace;
+//        enum shim = Replace!(q{
+//            alias Params[$i] __pyd_p$i;
+//            $override ReturnType!(__pyd_p$i.func_t) $realname(Parameters!(__pyd_p$i.func_t) t) $attrs {
+//                return __pyd_get_overload!("$realname", __pyd_p$i.func_t).func!(Parameters!(__pyd_p$i.func_t))("$name", t);
+//            }
+//            alias T.$realname $realname;
+//        }, "$i",i,"$realname",realname, "$name", name,
+//        "$attrs", attrs_to_string(functionAttributes!func_t) ~ " " ~ tattrs_to_string!(func_t)(),
+//        "$override",
+//        // todo: figure out what's going on here
+//        (variadicFunctionStyle!func == Variadic.no ? "override":""));
+//    }
+//}
+
 struct Def(alias fn, Options...) {
-    alias Args!("","", __traits(identifier,fn), "",Options) args;
+    alias args = Args!("","", __traits(identifier,fn), "",Options);
     static if(args.rem.length) {
-        alias args.rem[0] fn_t;
+        alias fn_t = args.rem[0];
     }else {
-        alias typeof(&fn) fn_t;
+        alias fn_t = typeof(&fn);
     }
     mixin _Def!(fn, args.pyname, fn_t, args.docstring);
 }
-
-template _Def(alias _fn, string name, fn_t, string docstring) {
-    import d2py.func_wrap: method_wrap;
-
-    alias func=def_selector!(_fn,fn_t).FN;
+private template _Def(alias _fn, string name, fn_t, string docstring) {
+    alias func = def_selector!(_fn,fn_t).FN;
     static assert(!__traits(isStaticFunction, func)); // TODO
-    static assert((functionAttributes!fn_t & (
-                    FunctionAttribute.nothrow_|
-                    FunctionAttribute.pure_|
-                    FunctionAttribute.trusted|
-                    FunctionAttribute.safe)) == 0,
-            "pyd currently does not support pure, nothrow, @trusted, or @safe member functions");
-    alias func_t = fn_t;              /*StripSafeTrusted!*/
+    static assert(
+        0 == (functionAttributes!fn_t & (FunctionAttribute.nothrow_ | FunctionAttribute.pure_ | FunctionAttribute.trusted | FunctionAttribute.safe)),
+        "pyd currently does not support pure, nothrow, @trusted, or @safe member functions"
+    );
+    alias /*StripSafeTrusted!*/func_t = fn_t;
     enum realname = __traits(identifier,func);
     enum funcname = name;
     enum min_args = minArgs!(func);
@@ -339,8 +394,8 @@ template _Def(alias _fn, string name, fn_t, string docstring) {
         import pyd.util.replace: Replace;
         enum shim = Replace!(q{
             alias Params[$i] __pyd_p$i;
-            $override ReturnType!(__pyd_p$i.func_t) $realname(Parameters!(__pyd_p$i.func_t) t) $attrs {
-                return __pyd_get_overload!("$realname", __pyd_p$i.func_t).func!(Parameters!(__pyd_p$i.func_t))("$name", t);
+            $override ReturnType!(__pyd_p$i.func_t) $realname(ParameterTypeTuple!(__pyd_p$i.func_t) t) $attrs {
+                return __pyd_get_overload!("$realname", __pyd_p$i.func_t).func!(ParameterTypeTuple!(__pyd_p$i.func_t))("$name", t);
             }
             alias T.$realname $realname;
         }, "$i",i,"$realname",realname, "$name", name,
@@ -350,6 +405,8 @@ template _Def(alias _fn, string name, fn_t, string docstring) {
         (variadicFunctionStyle!func == Variadic.no ? "override":""));
     }
 }
+
+
 
 /**
 Wraps a static member function of the class. Similar to pyd.def.def
@@ -1162,8 +1219,8 @@ struct OpCall(Args_t...) {
     enum bool needs_shim = false;
 
     // DBHERE
-    import d2py.attributes : signatureWithAttributes;
-    pragma(msg, "pyd.class_wrap.OpCall #1");
+    import pyd.reboot.attributes : signatureWithAttributes;
+    static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall #1");
 
 
     template Inner(T) {
@@ -1192,9 +1249,9 @@ struct OpCall(Args_t...) {
 
         // DBHERE
         alias f = opcall_wrap!(cT, fn);
-        pragma(msg, "pyd.class_wrap.OpCall.call #2  fn - "~signatureWithAttributes!fn);
+        static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall.call #2  fn - "~signatureWithAttributes!fn);
         type.tp_call = &f.func;
-        pragma(msg, "pyd.class_wrap.OpCall.call #3  f - "~signatureWithAttributes!f);
+        static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall.call #3  f - "~signatureWithAttributes!f);
     }
     template shim(size_t i,T) {
         // bah
@@ -1594,7 +1651,7 @@ Parameters:
     The class's docstring. Defaults to "".
   */
 void wrap_class(T, Params...)() {
-    alias Args!("","", __traits(identifier,T), "",Params) args;
+    alias args = Args!("","", __traits(identifier,T), "",Params);
     _wrap_class!(T, args.pyname, args.docstring, args.modulename, args.rem).wrap_class();
 }
 template _wrap_class(_T, string name, string docstring, string modulename, Params...) {
@@ -1602,13 +1659,13 @@ template _wrap_class(_T, string name, string docstring, string modulename, Param
     import pyd.util.typelist;
     static if (is(_T == class)) {
         //pragma(msg, "wrap_class: " ~ name);
-        alias pyd.make_wrapper.make_wrapper!(_T, Params).wrapper shim_class;
+        alias shim_class = pyd.make_wrapper.make_wrapper!(_T, Params).wrapper;
         //alias W.wrapper shim_class;
-        alias _T T;
+        alias T = _T;
     } else {
         //pragma(msg, "wrap_struct: '" ~ name ~ "'");
-        alias void shim_class;
-        alias _T* T;
+        alias shim_class = void;
+        alias T = _T*;
     }
     void wrap_class() {
         if(!Pyd_Module_p(modulename)) {
@@ -1617,7 +1674,9 @@ template _wrap_class(_T, string name, string docstring, string modulename, Param
                 return;
             }
         }
-        alias PydTypeObject!(T) type;
+        alias type = PydTypeObject!(T)
+
+        ;
         init_PyTypeObject!T(type);
 
         foreach (param; Params) {
