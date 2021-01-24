@@ -17,10 +17,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
 module pyd.util.typeinfo;
 
 import std.traits;
-import std.compiler;
+import std.typetuple : TypeTuple;
+
+import pyd.util.dg_wrapper : isImmutableFunction, isConstFunction, isSharedFunction, isWildcardFunction;
+
 
 enum Constness {
     Mutable,
@@ -30,7 +34,7 @@ enum Constness {
 }
 
 string constness_ToString(Constness c) {
-    switch(c){
+    switch(c) {
         case Constness.Mutable:
             return "mutable";
         case Constness.Const:
@@ -45,54 +49,55 @@ string constness_ToString(Constness c) {
 }
 
 template constness(T) {
-    static if(is(T == immutable)) {
+    static if(is(T == immutable)){
         enum constness = Constness.Immutable;
-    }else static if(is(T == const)) {
+    }else static if(is(T == const)){
         enum constness = Constness.Const;
-    }else static if(is(T == inout)) {
-        enum constness = Constness.Wildcard;
-    }else {
-        enum constness = Constness.Mutable;
-    }
+    }else static if(is(T == inout)){
+            enum constness = Constness.Wildcard;
+        }else{
+            enum constness = Constness.Mutable;
+        }
 }
 
 bool constCompatible(Constness c1, Constness c2) {
     return c1 == c2 ||
-        c1 == Constness.Const && c2 != Constness.Wildcard ||
-        c2 == Constness.Const && c1 != Constness.Wildcard;
+    c1 == Constness.Const && c2 != Constness.Wildcard ||
+    c2 == Constness.Const && c1 != Constness.Wildcard;
 }
 
 template ApplyConstness(T, Constness constness) {
-    alias Unqual!T Tu;
-    static if(constness == Constness.Mutable) {
-        alias Tu ApplyConstness;
-    }else static if(constness == Constness.Const) {
-        alias const(Tu) ApplyConstness;
-    }else static if(constness == Constness.Wildcard) {
-        alias inout(Tu) ApplyConstness;
-    }else static if(constness == Constness.Immutable) {
-        alias immutable(Tu) ApplyConstness;
-    }else {
-        static assert(0);
-    }
+    alias Tu = Unqual!T;
+    static if(constness == Constness.Mutable){
+        alias ApplyConstness = Tu;
+    }else static if(constness == Constness.Const){
+        alias ApplyConstness = const(Tu);
+    }else static if(constness == Constness.Wildcard){
+            alias ApplyConstness = inout(Tu);
+        }else static if(constness == Constness.Immutable){
+                alias ApplyConstness = immutable(Tu);
+            }else{
+                static assert(0);
+            }
 }
 
 template ApplyConstness2(T, Constness constness) {
-    alias Unqual!T Tu;
-    static if(constness == Constness.Mutable) {
-        alias Tu ApplyConstness2;
-    }else static if(constness == Constness.Const) {
-        alias const(Tu) ApplyConstness2;
-    }else static if(constness == Constness.Wildcard) {
-        alias Tu ApplyConstness2;
-    }else static if(constness == Constness.Immutable) {
-        alias immutable(Tu) ApplyConstness2;
-    }else {
-        static assert(0);
-    }
+    alias Tu = Unqual!T;
+    static if(constness == Constness.Mutable){
+        alias ApplyConstness2 = Tu;
+    }else static if(constness == Constness.Const){
+        alias ApplyConstness2 = const(Tu);
+    }else static if(constness == Constness.Wildcard){
+            alias ApplyConstness2 = Tu;
+        }else static if(constness == Constness.Immutable){
+                alias ApplyConstness2 = immutable(Tu);
+            }else{
+                static assert(0);
+            }
 }
 
 string attrs_to_string(uint attrs) {
+    import std.compiler: version_major, version_minor;
     string s = "";
     with(FunctionAttribute) {
         if(attrs & pure_) s ~= " pure";
@@ -102,9 +107,26 @@ string attrs_to_string(uint attrs) {
         if(attrs & trusted) s ~= " @trusted";
         if(attrs & safe) s ~= " @safe";
         if(attrs & nogc) s ~= " @nogc";
-        static if(version_major == 2 && version_minor >= 67) {
+        static if(version_major == 2 && version_minor >= 67){
             if(attrs & return_) s ~= " return";
         }
+    }
+    return s;
+}
+
+string tattrs_to_string(F)() {
+    string s;
+    if (isConstFunction!F) {
+        s ~= " const";
+    }
+    if (isImmutableFunction!F) {
+        s ~= " immutable";
+    }
+    if (isSharedFunction!F) {
+        s ~= " shared";
+    }
+    if (isWildcardFunction!F) {
+        s ~= " inout";
     }
     return s;
 }
@@ -112,73 +134,70 @@ string attrs_to_string(uint attrs) {
 // what U should be so 'new U' returns a T
 template NewParamT(T) {
     static if(isPointer!T && is(PointerTarget!T == struct))
-        alias PointerTarget!T NewParamT;
-    else alias T NewParamT;
+        alias NewParamT = PointerTarget!T;
+    else
+        alias NewParamT = T;
 }
 
 template StripSafeTrusted(F) {
     enum attrs = functionAttributes!F ;
     enum desired_attrs = attrs & ~FunctionAttribute.safe & ~FunctionAttribute.trusted;
     enum linkage = functionLinkage!F;
-    alias SetFunctionAttributes!(F, linkage, desired_attrs) unqual_F;
-    static if(isFunctionPointer!F) {
+    alias unqual_F = SetFunctionAttributes!(F, linkage, desired_attrs);
+    static if(isFunctionPointer!F){
         enum constn = constness!(PointerTarget!F);
-        alias ApplyConstness!(PointerTarget!unqual_F, constn)* StripSafeTrusted;
-    }else static if(isDelegate!F) {
+        alias StripSafeTrusted = ApplyConstness!(PointerTarget!unqual_F, constn)*;
+    }else static if(isDelegate!F){
         enum constn = constness!(F);
-        alias ApplyConstness!(unqual_F, constn) StripSafeTrusted;
+        alias StripSafeTrusted = ApplyConstness!(unqual_F, constn);
     }else{
         enum constn = constness!(F);
-        alias ApplyConstness!(unqual_F, constn) StripSafeTrusted;
+        alias StripSafeTrusted = ApplyConstness!(unqual_F, constn);
     }
-
-
 }
 
 class Z {
-    void a() immutable
-    {
-    }
+    void a() immutable {}
 }
+
 //static assert(is(StripSafeTrusted!(typeof(&Z.a)) == typeof(&Z.a) ));
 //static assert(is(StripSafeTrusted!(typeof(&Z.init.a)) == typeof(&Z.init.a) ));
-import std.traits : isCallable;
-import std.typetuple : TypeTuple;
+
 template WorkaroundParameterDefaults(func...)
-	if (func.length == 1 && isCallable!func)
-{
-    static if (is(FunctionTypeOf!(func[0]) PT == __parameters))
-    {
-        template Get(size_t i)
-        {
+if (func.length == 1 && isCallable!func) {
+    static if(is(FunctionTypeOf!(func[0]) PT == __parameters)){
+
+        template Get(size_t i) {
             // workaround scope escape check, see
             // https://issues.dlang.org/show_bug.cgi?id=16582
             // should use return scope once available
             enum get = (PT[i .. i + 1] __args) @trusted
-			{
+            {
                 // If __args[0] is lazy, we force it to be evaluated like this.
                 auto __pd_value = __args[0];
                 auto __pd_val = &__pd_value; // workaround Bugzilla 16582
                 return *__pd_val;
             };
-            static if (is(typeof(get())))
+
+            static if (is(typeof(get()))){
                 enum Get = get();
-            else
+            }else{
                 alias Get = void;
                 // If default arg doesn't exist, returns void instead.
+            }
         }
-    }
-    else
-    {
+
+    }else{
+
         static assert(0, func[0].stringof ~ "is not a function");
 
         // Define dummy entities to avoid pointless errors
         template Get(size_t i) { enum Get = ""; }
         alias PT = TypeTuple!();
+
     }
 
-    template Impl(size_t i = 0)
-    {
+    template Impl(size_t i = 0) {
         static if (i == PT.length)
             alias Impl = TypeTuple!();
         else
@@ -188,17 +207,20 @@ template WorkaroundParameterDefaults(func...)
     alias WorkaroundParameterDefaults = Impl!();
 }
 
-@safe unittest
-{
+
+@safe unittest {
+
     int foo(int num, string name = "hello", int[] = [1,2,3], lazy int x = 0);
     static assert(is(WorkaroundParameterDefaults!foo[0] == void));
     static assert(   WorkaroundParameterDefaults!foo[1] == "hello");
     static assert(   WorkaroundParameterDefaults!foo[2] == [1,2,3]);
     static assert(   WorkaroundParameterDefaults!foo[3] == 0);
+
 }
 
-@safe unittest
-{
+
+@safe unittest {
+
     alias PDVT = WorkaroundParameterDefaults;
 
     void bar(int n = 1, string s = "hello"){}
@@ -220,15 +242,15 @@ template WorkaroundParameterDefaults(func...)
     static assert(PDVT!foo[0] == 3);
     static assert(is(typeof(PDVT!foo) == typeof(TypeTuple!(3))));
 
-    struct Colour
-    {
+    struct Colour {
         ubyte a,r,g,b;
-
         static immutable Colour white = Colour(255,255,255,255);
     }
+
     void bug8106(Colour c = Colour.white) {}
     //pragma(msg, PDVT!bug8106);
     static assert(PDVT!bug8106[0] == Colour.white);
     void bug16582(scope int* val = null) {}
     static assert(PDVT!bug16582[0] is null);
+
 }
