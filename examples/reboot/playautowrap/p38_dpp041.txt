@@ -1,0 +1,18 @@
+Running pre-generate commands for autowrap:pynih...
+/Users/david/.dub/packages/dpp-0.4.1/dpp/bin/d++ --preprocess-only --include-path /Library/Frameworks/Python.framework/Versions/3.8/include/python3.8 source/python/raw.d
+Fatal error: core.exception.RangeError@source/dpp/translation/type/package.d(505): Range violation
+----------------
+??:? _d_arrayboundsp [0x1071188b1]
+source/dpp/clang/package.d:110 pure @safe void dpp.translation.type.translateElaborated(scope const(immutable(char)[]), ref dpp.runtime.context.Context).remember(in immutable(char)[]) [0x1070e6ce0]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.type.translateElaborated(scope const(immutable(char)[]), ref dpp.runtime.context.Context) [0x1070e6a44]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.macro_.translateToD(in clang.Cursor, ref dpp.runtime.context.Context, in clang.Token[]) [0x1070d6e81]
+source/dpp/clang/package.d:110 @safe immutable(char)[][] dpp.translation.macro_.translateMacro(in clang.Cursor, ref dpp.runtime.context.Context) [0x1070d6404]
+source/dpp/clang/package.d:110 @safe immutable(char)[][] dpp.translation.translation.translate(in clang.Cursor, ref dpp.runtime.context.Context, in immutable(char)[], in ulong) [0x1070e0f2b]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.translation.translateTopLevelCursor(in clang.Cursor, ref dpp.runtime.context.Context, in immutable(char)[], in ulong) [0x1070e07cd]
+source/dpp/clang/package.d:110 @safe void dpp.expansion.expand(in immutable(char)[], ref dpp.runtime.context.Context, in immutable(char)[][], in immutable(char)[], in ulong) [0x1070448d9]
+source/dpp/clang/package.d:110 @safe dpp.runtime.app.TranslationText dpp.runtime.app.translationText!(std.stdio.File).translationText(in dpp.runtime.options.Options, in immutable(char)[]) [0x107070751]
+source/dpp/clang/package.d:110 @safe void dpp.runtime.app.preprocess!(std.stdio.File).preprocess(in dpp.runtime.options.Options, in immutable(char)[], in immutable(char)[]) [0x10707022f]
+source/dpp/clang/package.d:110 @safe void dpp.runtime.app.run(in dpp.runtime.options.Options) [0x10706ed01]
+source/main.d:9 _Dmain [0x10703f1ec]
+make: *** [source/python/raw.d] Error 2
+Command failed with exit code 2: make -C /Users/david/repos/github/symmetryinvestments/autowrap/pynih source/python/raw.d

@@ -1,0 +1,38 @@
+Running pre-generate commands for autowrap:pynih...
+/Users/david/.dub/packages/dpp-0.4.2/dpp/bin/d++ --preprocess-only --include-path /Library/Frameworks/Python.framework/Versions/3.8/include/python3.8 source/python/raw.d
+Fatal error: core.exception.RangeError@source/dpp/translation/type/package.d(505): Range violation
+----------------
+??:? _d_arrayboundsp [0x10ac00155]
+source/dpp/clang/package.d:110 pure @safe void dpp.translation.type.translateElaborated(scope const(immutable(char)[]), ref dpp.runtime.context.Context).remember(in immutable(char)[]) [0x10abce574]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.type.translateElaborated(scope const(immutable(char)[]), ref dpp.runtime.context.Context) [0x10abce2d8]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.macro_.translateToD(in clang.Cursor, ref dpp.runtime.context.Context, in clang.Token[]) [0x10abbdc45]
+source/dpp/clang/package.d:110 @safe immutable(char)[][] dpp.translation.macro_.translateMacro(in clang.Cursor, ref dpp.runtime.context.Context) [0x10abbd1c8]
+source/dpp/clang/package.d:110 @safe immutable(char)[][] dpp.translation.translation.translate(in clang.Cursor, ref dpp.runtime.context.Context, in immutable(char)[], in ulong) [0x10abc87bf]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.translation.translateTopLevelCursor(in clang.Cursor, ref dpp.runtime.context.Context, in immutable(char)[], in ulong) [0x10abc8061]
+source/dpp/clang/package.d:110 @safe void dpp.expansion.expand(in immutable(char)[], ref dpp.runtime.context.Context, in immutable(char)[][], in immutable(char)[], in ulong) [0x10ab29fed]
+source/dpp/clang/package.d:110 @safe dpp.runtime.app.TranslationText dpp.runtime.app.translationText(in dpp.runtime.options.Options, in immutable(char)[]) [0x10ab556c4]
+source/dpp/clang/package.d:110 @safe void dpp.runtime.app.preprocess(in dpp.runtime.options.Options, in immutable(char)[], in immutable(char)[]) [0x10ab5508f]
+source/dpp/clang/package.d:110 @safe void dpp.runtime.app.run(in dpp.runtime.options.Options) [0x10ab54571]
+source/main.d:9 _Dmain [0x10ab24900]
+make: *** [source/python/raw.d] Error 2
+
+
+Command failed with exit code 2: make -C /Users/david/repos/github/symmetryinvestments/autowrap/pynih source/python/raw.d
+Running pre-generate commands for autowrap:pynih...
+/Users/david/.dub/packages/dpp-0.4.2/dpp/bin/d++ --preprocess-only --include-path /Library/Frameworks/Python.framework/Versions/3.8/include/python3.8 source/python/raw.d
+Fatal error: core.exception.RangeError@source/dpp/translation/type/package.d(505): Range violation
+----------------
+??:? _d_arrayboundsp [0x10dbdc155]
+source/dpp/clang/package.d:110 pure @safe void dpp.translation.type.translateElaborated(scope const(immutable(char)[]), ref dpp.runtime.context.Context).remember(in immutable(char)[]) [0x10dbaa574]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.type.translateElaborated(scope const(immutable(char)[]), ref dpp.runtime.context.Context) [0x10dbaa2d8]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.macro_.translateToD(in clang.Cursor, ref dpp.runtime.context.Context, in clang.Token[]) [0x10db99c45]
+source/dpp/clang/package.d:110 @safe immutable(char)[][] dpp.translation.macro_.translateMacro(in clang.Cursor, ref dpp.runtime.context.Context) [0x10db991c8]
+source/dpp/clang/package.d:110 @safe immutable(char)[][] dpp.translation.translation.translate(in clang.Cursor, ref dpp.runtime.context.Context, in immutable(char)[], in ulong) [0x10dba47bf]
+source/dpp/clang/package.d:110 @safe immutable(char)[] dpp.translation.translation.translateTopLevelCursor(in clang.Cursor, ref dpp.runtime.context.Context, in immutable(char)[], in ulong) [0x10dba4061]
+source/dpp/clang/package.d:110 @safe void dpp.expansion.expand(in immutable(char)[], ref dpp.runtime.context.Context, in immutable(char)[][], in immutable(char)[], in ulong) [0x10db05fed]
+source/dpp/clang/package.d:110 @safe dpp.runtime.app.TranslationText dpp.runtime.app.translationText(in dpp.runtime.options.Options, in immutable(char)[]) [0x10db316c4]
+source/dpp/clang/package.d:110 @safe void dpp.runtime.app.preprocess(in dpp.runtime.options.Options, in immutable(char)[], in immutable(char)[]) [0x10db3108f]
+source/dpp/clang/package.d:110 @safe void dpp.runtime.app.run(in dpp.runtime.options.Options) [0x10db30571]
+source/main.d:9 _Dmain [0x10db00900]
+make: *** [source/python/raw.d] Error 2
+Command failed with exit code 2: make -C /Users/david/repos/github/symmetryinvestments/autowrap/pynih source/python/raw.d
