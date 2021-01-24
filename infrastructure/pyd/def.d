@@ -25,10 +25,13 @@ SOFTWARE.
   */
 module pyd.def;
 
+import std.typetuple;
+import std.stdio;
+import std.traits;
+import std.exception;
+
 import deimos.python.Python;
 
-import std.typetuple;
-import std.traits;
 import pyd.util.conv;
 import pyd.util.typelist;
 import pyd.func_wrap;
@@ -275,7 +278,7 @@ extern(C) void Py_Finalize_hook() {
 version(PydPythonExtension)
 {
     /// For embedding python
-    void py_init()()
+    void py_innit()()
     {
         static assert(false, "py_init should only be called when embedding python");
     }
@@ -310,10 +313,13 @@ void py_finish() {
  * For extending python.
  */
 PyObject* module_init(string docstring="") {
+    pragma(msg, "module_init");
     Py_AtExit(&Py_Finalize_hook);
     string name = pyd_module_name;
     ready_module_methods("");
-    version(Python_3_0_Or_Later) {
+
+    version(Python_3_0_Or_Later){
+
         PyModuleDef* modl = pyd_moduledefs[""] = new PyModuleDef;
         (cast(PyObject*) modl).ob_refcnt = 1;
         modl.m_name = zcc(name);
@@ -323,9 +329,15 @@ PyObject* module_init(string docstring="") {
         pyd_module_classes[""] = (void delegate()[string]).init;
 
         Py3_ModuleInit!"".func();
-    }else {
-        pyd_modules[""] = Py_INCREF(Py_InitModule3((name ~ "\0"),
-                    module_methods[""].ptr, (docstring ~ "\0")));
+
+    }else{
+
+        pyd_modules[""] = Py_INCREF(Py_InitModule3(
+            (name ~ "\0"),
+            module_methods[""].ptr,
+            (docstring ~ "\0")
+        ));
+
     }
     doActions(PyInitOrdering.Before);
     doActions(PyInitOrdering.After);
@@ -421,13 +433,13 @@ version(Python_3_0_Or_Later) {
 
   py_init will ensure they are called at the appropriate time
   */
-void on_py_init(void delegate() dg,
-        PyInitOrdering ord = ModuleInit) {
+void on_py_init(void delegate() dg, PyInitOrdering ord = ModuleInit) {
     import std.exception: enforce;
 
     with(PyInitOrdering) switch(ord) {
         case Before:
             if(py_init_called) {
+                writeln("py_init has already been called - can you call on_py_init({<your code>}, PyInitOrdering.After)?");
                 enforce(0, "py_init has already been called");
             }
             before_py_init_deferred_actions ~= dg;

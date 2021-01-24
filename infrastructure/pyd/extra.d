@@ -77,7 +77,7 @@ if((isArray!T || IsStaticArrayPointer!T) &&
     Py_ssize_t[] shape = MatrixInfo!T.build_shape(t);
     PyObject* pyshape = d_to_python(shape);
     PyObject* pyformat = NumpyFormatType!ME.pyType();
-    PyObject* args = PyTuple_FromItems(pyshape, pyformat);
+    PyObject* args = items_to_PyTuple(pyshape, pyformat);
     scope(exit) Py_DECREF(args);
     PyObject* ndarray = numpy_ndarray_Type.tp_new(numpy_ndarray_Type, args, null);
     if(!ndarray) handle_exception();
@@ -101,7 +101,7 @@ if((isArray!T || IsStaticArrayPointer!T) &&
 PyObject* d_to_numpy_datetime64(T)(T t) {
     PyObject* datetime = d_to_python(t);
     scope(exit) Py_DECREF(datetime);
-    PyObject* args = PyTuple_FromItems(datetime);
+    PyObject* args = items_to_PyTuple(datetime);
     scope(exit) Py_DECREF(args);
     PyObject* datetime64 = numpy_datetime64.tp_new(numpy_datetime64, args, null);
     return datetime64;

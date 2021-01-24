@@ -374,7 +374,7 @@ int PySequence_Check(PyObject* o);
 /// _
 Py_ssize_t PySequence_Size(PyObject* o);
 /// _
-alias PySequence_Size PySequence_Length;
+alias PySequence_Length = PySequence_Size;
 /// _
 PyObject* PySequence_Concat(PyObject* o1, PyObject* o2);
 /// _

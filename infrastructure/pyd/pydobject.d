@@ -476,7 +476,7 @@ Struct Format Strings </a>
      * Calls the PydObject with any convertible D items.
      */
     PydObject opCall(T ...) (T t) {
-        PyObject* tuple = PyTuple_FromItems(t);
+        PyObject* tuple = items_to_PyTuple(t);
         if (tuple is null) handle_exception();
         PyObject* result = PyObject_CallObject(m_ptr, tuple);
         Py_DECREF(tuple);
@@ -533,7 +533,7 @@ Struct Format Strings </a>
     PydObject method(T ...) (string name, T t) {
         PyObject* mthd = PyObject_GetAttrString(m_ptr, zcc(name));
         if (mthd is null) handle_exception();
-        PyObject* tuple = PyTuple_FromItems(t);
+        PyObject* tuple = items_to_PyTuple(t);
         if (tuple is null) {
             Py_DECREF(mthd);
             handle_exception();

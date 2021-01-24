@@ -39,6 +39,8 @@ public {
     import pyd.pydobject;
     import pyd.struct_wrap;
 
+    import pyd.reboot._dispatch_utils;
+
     // Importing these is only needed as a workaround to bug #311
     import pyd.ctor_wrap;
     import pyd.exception;

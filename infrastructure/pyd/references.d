@@ -386,8 +386,8 @@ T get_d_reference(T) (PyObject* _self) {
     return range.front.FromKey!T();
 }
 
-/// If the passed D reference has an existing Python object, return a borrowed
-/// reference to it. Otherwise, return null.
+// If the passed D reference has an existing Python object, return a borrowed
+// reference to it. Otherwise, return null.
 PyObject_BorrowedRef* get_python_reference(T) (T t) {
     alias pyd_references!T.container container;
     alias pyd_references!T.Mapping Mapping;

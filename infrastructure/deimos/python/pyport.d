@@ -11,12 +11,12 @@ import core.stdc.config;
  * most other operating systems. */
 
 /// _
-alias long C_longlong;
+alias C_longlong = long;
 /// _
-alias ulong C_ulonglong;
+alias C_ulonglong = ulong;
 
-alias core.stdc.config.c_long C_long;
-alias core.stdc.config.c_ulong C_ulong;
+alias C_long = core.stdc.config.c_long;
+alias C_ulong = core.stdc.config.c_ulong;
 
 /*
  * Py_ssize_t is defined as a signed type which is 8 bytes on X86_64 and 4
@@ -25,32 +25,32 @@ alias core.stdc.config.c_ulong C_ulong;
 version(Python_2_5_Or_Later){
     version (X86_64) {
         /// _
-        alias long Py_ssize_t;
+        alias Py_ssize_t = long;
     } else {
         /// _
-        alias int Py_ssize_t;
+        alias Py_ssize_t = int;
     }
     version(Python_3_2_Or_Later) {
         /// Availability: >= 3.2
         /// (Py_hash_t invariably replaces C_long, so we always define it for
         /// convenience)
-        alias Py_ssize_t Py_hash_t;
+        alias Py_hash_t = Py_ssize_t;
         /// Availability: >= 3.2
-        alias size_t Py_uhash_t;
+        alias Py_uhash_t = size_t;
     }else{
-        alias C_long Py_hash_t;
+        alias Py_hash_t = C_long;
     }
 }else {
     /*
      * Seems Py_ssize_t didn't exist in 2.4, and int was everywhere it is now.
      */
     /// _
-    alias int Py_ssize_t;
+    alias Py_ssize_t = int;
     /*
      * Seems Py_hash_t didn't exist in 2.4, and C_long was everywhere it is now.
      */
     /// _
-    alias C_long Py_hash_t;
+    alias Py_hash_t = C_long;
 }
 
 version(linux) version(DigitalMars) version = dmd_linux;

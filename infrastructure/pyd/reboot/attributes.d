@@ -1,4 +1,4 @@
-module d2py.attributes;
+module pyd.reboot.attributes;
 
 struct pykwargs { string name; this(string name) {this.name = name;}}
 struct pyargs { string name; this(string name) {this.name = name;}}

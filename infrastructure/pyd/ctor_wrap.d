@@ -22,16 +22,22 @@ SOFTWARE.
 module pyd.ctor_wrap;
 
 import std.traits;
-import std.exception: enforce;
-import pyd.util.typelist: Join;
-import pyd.util.typeinfo;
-import pyd.util.replace: Replace;
+import std.exception:  enforce;
+
 import deimos.python.Python;
+
+import pyd.util.typelist : Join;
+import pyd.util.typeinfo : NewParamT;
+import pyd.util.replace : Replace;
 import pyd.references;
 import pyd.class_wrap;
 import pyd.exception;
 import pyd.func_wrap;
 import pyd.make_object;
+
+import pyd.reboot._dispatch : applyFnAliasToArgsKwargs;
+import pyd.reboot._dispatch_utils : supportsNArgs;
+
 
 template call_ctor(T, init) {
     alias Parameters!(init.Inner!T.FN) paramtypes;
@@ -100,7 +106,7 @@ if(is(T == class) || (isPointer!T && is(PointerTarget!T == struct))) {
             foreach(i, init; C) {
                 if (supportsNArgs!(init.Inner!T.FN)(len)) {
                     alias call_ctor!(T, init).func fn;
-                    T t = applyPyTupleToAlias!(fn, classname)(args, kwargs);
+                    T t = applyFnAliasToArgsKwargs!(fn, classname)(args, kwargs);
                     if (t is null) {
                         PyErr_SetString(PyExc_RuntimeError, "Class ctor redirect didn't return a class instance!");
                         return -1;

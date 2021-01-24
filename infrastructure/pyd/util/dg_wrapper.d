@@ -2,6 +2,7 @@ module pyd.util.dg_wrapper;
 
 import std.traits;
 
+import pyd.reboot.common : RebootFullTrace;
 
 
 // dirty hacks for converting between function and delegate types. As of DMD 0.174,
@@ -9,9 +10,9 @@ import std.traits;
 
 
 // converts a pointer to a member function into a delegate.
-auto dg_wrapper(T, Fn) (T t, Fn fn) {
-    pragma(msg, "pyd.util.dg_wrapper.dg_wrapper fn - ");
-    fn_to_dg!(Fn) dg;
+auto dg_wrapper(T, F) (T t, F fn) {
+    static if(RebootFullTrace) pragma(msg, "pyd.util.dg_wrapper.dg_wrapper fn - ");
+    fn_to_dg!(F) dg;
     dg.ptr = cast(void*) t;
     static if(variadicFunctionStyle!fn == Variadic.typesafe) {
         // trying to stuff a Ret function(P[]...) into a Ret function(P[])
@@ -24,29 +25,29 @@ auto dg_wrapper(T, Fn) (T t, Fn fn) {
 }
 
 // converts function type into an equivalent delegate type.
-template fn_to_dg(Fn) {
-    alias fn_to_dg = fn_to_dgT!(Fn).type;
+template fn_to_dg(F) {
+    alias fn_to_dg = fn_to_dgT!(F).type;
 }
 
-template fn_to_dgT(Fn) {
-    alias T = Parameters!(Fn);
-    alias Ret = ReturnType!(Fn);
+template fn_to_dgT(F) {
+    alias T = Parameters!F;
+    alias Ret = ReturnType!F;
 
-    mixin("alias Ret delegate(T) " ~ tattrs_to_string!(Fn)() ~ " type;");
+    mixin("alias Ret delegate(T) " ~ tattrs_to_string!F() ~ " type;");
 }
 
-string tattrs_to_string(fn_t)() {
+private string tattrs_to_string(F)() {
     string s;
-    if(isConstFunction!fn_t) {
+    if(isConstFunction!F) {
         s ~= " const";
     }
-    if(isImmutableFunction!fn_t) {
+    if(isImmutableFunction!F) {
         s ~= " immutable";
     }
-    if(isSharedFunction!fn_t) {
+    if(isSharedFunction!F) {
         s ~= " shared";
     }
-    if(isWildcardFunction!fn_t) {
+    if(isWildcardFunction!F) {
         s ~= " inout";
     }
     return s;

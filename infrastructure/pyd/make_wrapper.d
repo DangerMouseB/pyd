@@ -100,7 +100,7 @@ template OverloadShim() {
                     result = dg(item);
                 } else {
                     if (PyTuple_Check(item)) {
-                        result = applyPyTupleToDelegate(dg, item);
+                        result = applyDelegateToPyTuple(dg, item);
                     } else {
                         static if (args == 1) {
                             arg_t t = python_to_d!(typeof(arg_t))(item);

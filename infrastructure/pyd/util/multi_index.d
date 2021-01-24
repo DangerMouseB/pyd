@@ -4236,7 +4236,7 @@ struct ValueChangedSlots(L...) {
 
 
         template GetIndex(valueSignal){
-            static if(__traits(compiles,valueSignal.Index)){
+            static if(__traits(compiles, valueSignal.Index)){
                 enum GetIndex = valueSignal.Index;
             }else{
                 static assert(__traits(compiles,valueSignal.Tag));
