@@ -17,7 +17,7 @@ PyObject* PyEval_EvalCodeEx(
         PyObject* globals,
         PyObject* locals,
         PyObject** args, int argc,
-        PyObject** kwds, int kwdc,
+        PyObject** kwargs, int kwdc,
         PyObject** defs, int defc,
         PyObject* closure
 );

@@ -75,18 +75,10 @@ string gensym(Taken...)() {
 
 
 /**
-  Finds the minimal number of arguments a given function needs to be provided
- */
-template minArgs(alias fn, fnT = typeof(&fn)) {
-    enum size_t minArgs = minNumArgs_impl!(fn, fnT).res;
-}
-
-
-/**
   Finds the maximum number of arguments a given function may be provided
   and/or whether the function has a maximum number of arguments.
   */
-template maxArgs(alias fn, fn_t = typeof(&fn)) {
+template maxArgs(alias fn, fnT=typeof(&fn)) {
     alias vstyle = variadicFunctionStyle!fn;
     alias ps = Parameters!fn;
     /// _
@@ -95,8 +87,13 @@ template maxArgs(alias fn, fn_t = typeof(&fn)) {
     enum size_t max = ps.length;
 }
 
-
-template minNumArgs_impl(alias fn, fnT) {
+/**
+  Finds the minimal number of arguments a given function needs to be provided
+ */
+template minArgs(alias fn, fnT=typeof(&fn)) {
+    enum size_t minArgs = minNumArgs_impl!(fn, fnT).res;
+}
+private template minNumArgs_impl(alias fn, fnT) {
     alias Params = Parameters!(fnT);
     //https://issues.dlang.org/show_bug.cgi?id=17192
     //alias ParameterDefaultValueTuple!(fn) Defaults;
@@ -108,13 +105,15 @@ template minNumArgs_impl(alias fn, fnT) {
     }else static if(vstyle == Variadic.typesafe){
         // handle func(nondefault T1 t1, nondefault T2 t2, etc, TN[]...)
         enum res = Params.length-1;
-    }else {
+    }else{
         size_t count_nondefault() {
             size_t result = 0;
             foreach(i, v; Defaults) {
                 static if(is(v == void)) {
                     result ++;
-                }else break;
+                }else{
+                    break;
+                }
             }
             return result;
         }

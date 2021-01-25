@@ -1,11 +1,15 @@
 module pyd.reboot.attributes;
 
-struct pykwargs { string name; this(string name) {this.name = name;}}
-struct pyargs { string name; this(string name) {this.name = name;}}
-struct pymagic { string name; this(string name) {this.name = name;}}
-enum pyclass;
-enum pyignore;
+import std.traits : hasUDA;
 
+struct kwargs { string name; this(string name) {this.name = name;}}
+struct args { string name; this(string name) {this.name = name;}}
+struct pymagic { string name; this(string name) {this.name = name;}}
+enum pyignore;
+enum __repr__;
+enum __str__;
+enum __call__;
+enum __hash__;
 
 
 string signatureWithAttributes(alias fn)() {
@@ -25,11 +29,11 @@ string signatureWithAttributes(alias fn)() {
                     s ~= " ";
                 }
                 if (is(typeof(attribute) == pymagic)) {
-                    s ~= "pymagic("~attribute.name~")";
-                } else if (is(typeof(attribute) == pykwargs)) {
-                    s ~= "pykwargs("~attribute.name~")";
-                } else if (is(typeof(attribute) == pyargs)) {
-                    s ~= "pyargs("~attribute.name~")";
+                    s ~= "@pymagic("~attribute.name~")";
+                } else if (is(typeof(attribute) == kwargs)) {
+                    s ~= "@kwargs("~attribute.name~")";
+                } else if (is(typeof(attribute) == args)) {
+                    s ~= "@args("~attribute.name~")";
                 } else {
                     s ~= attribute.stringof;
                 }
@@ -42,25 +46,9 @@ string signatureWithAttributes(alias fn)() {
     }
 }
 
-bool hasArgs(alias x)() {
-    //auto attributes = __traits(getAttributes, x);
-    //if (attributes.length == 0) return false;
-    //foreach(attribute; attributes) {
-    //    if (is(typeof(attribute) == pyargs)) {
-    //        return true;
-    //    }
-    //}
-    return false;
-}
 
-bool hasKwargs(alias x)() {
-    //auto attributes = __traits(getAttributes, x);
-    //if (attributes.length == 0) return false;
-    //foreach(attribute; attributes) {
-    //    if (is(typeof(attribute) == pykwargs)) {
-    //        return true;
-    //    }
-    //}
-    return false;
-}
+bool fnHasArgsAttr(alias x)() {return hasUDA!(x, args);}
+bool fnHasKwargsAttr(alias x)() {return hasUDA!(x, kwargs);}
+bool fnHasMagicAttr(alias x)() {return hasUDA!(x, pymagic);}
+bool fnHasIgnoreAttr(alias x)() {return hasUDA!(x, pymagic);}
 

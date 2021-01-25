@@ -35,7 +35,8 @@ import pyd.exception;
 import pyd.func_wrap;
 import pyd.make_object;
 
-import pyd.reboot._dispatch : applyFnAliasToArgsKwargs;
+
+import pyd.reboot._dispatch : callFuncArgsKwargsReturnDType;
 import pyd.reboot._dispatch_utils : supportsNArgs;
 
 
@@ -58,7 +59,7 @@ template call_ctor(T, init) {
 // The default __init__ method calls the class's zero-argument constructor.
 template wrapped_init(T) {
     extern(C)
-    int init(PyObject* self, PyObject* args, PyObject* kwds) {
+    int init(PyObject* self, PyObject* args, PyObject* kwargs) {
         return exception_catcher({
             set_pyd_mapping(self, new T);
             return 0;
@@ -69,7 +70,7 @@ template wrapped_init(T) {
 // The __init__ slot for wrapped structs.
 template wrapped_struct_init(T) if (is(T == struct)){
     extern(C)
-    int init(PyObject* self, PyObject* args, PyObject* kwds) {
+    int init(PyObject* self, PyObject* args, PyObject* kwargs) {
         return exception_catcher({
                 T* t = new T;
                 set_pyd_mapping(self, t);
@@ -78,21 +79,27 @@ template wrapped_struct_init(T) if (is(T == struct)){
     }
 }
 
-//import std.stdio;
+
+// https://docs.python.org/3/c-api/typeobj.html#c.PyTypeObject.tp_new
+// PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds);
+
+// https://docs.python.org/3/c-api/typeobj.html#c.PyTypeObject.tp_init
+// int tp_init(PyObject *self, PyObject *args, PyObject *kwds);
+
 // This template accepts a tuple of function pointer types, which each describe
 // a ctor of T, and  uses them to wrap a Python tp_init function.
 template wrapped_ctors(string classname, T,Shim, C ...)
 if(is(T == class) || (isPointer!T && is(PointerTarget!T == struct))) {
     //alias shim_class T;
     alias wrapped_class_object!(T) wrap_object;
-    alias NewParamT!T U;
+    alias U = NewParamT!T;
 
     extern(C)
     static int func(PyObject* self, PyObject* args, PyObject* kwargs) {
         Py_ssize_t arglen = PyObject_Length(args);
         Py_ssize_t kwlen = kwargs is null?-1:PyObject_Length(kwargs);
         enforce(arglen != -1);
-        Py_ssize_t len = arglen + ((kwlen == -1) ? 0:kwlen);
+        Py_ssize_t len = arglen + ((kwlen == -1) ? 0 : kwlen);
 
         return exception_catcher({
             // Default ctor
@@ -102,11 +109,11 @@ if(is(T == class) || (isPointer!T && is(PointerTarget!T == struct))) {
                     return 0;
                 }
             }
-            // find another Ctor
+            // find the first constructor that matches with supportsNArgs
             foreach(i, init; C) {
                 if (supportsNArgs!(init.Inner!T.FN)(len)) {
-                    alias call_ctor!(T, init).func fn;
-                    T t = applyFnAliasToArgsKwargs!(fn, classname)(args, kwargs);
+                    alias initFn = call_ctor!(T, init).func;
+                    T t = callFuncArgsKwargsReturnDType!(initFn, classname)(args, kwargs);
                     if (t is null) {
                         PyErr_SetString(PyExc_RuntimeError, "Class ctor redirect didn't return a class instance!");
                         return -1;

@@ -79,6 +79,39 @@ def testComparisons():
 
 def testMagic():
     m = Magic()
+
+    print(m(1))
+    print(m(fred=1))
+    1/0
+    print("fred")
+    print(m.fred(1,2,3))
+    print(m.fred(1,2,*(1,2,3)))
+    print(m.fred("hello"))
+
+
+    print("joe")
+    print(m.joe(s="hello", x="there"))
+    print(m.joe(1))
+
+    print("sally")
+    print(m.sally(s="hello", x="there"))
+    print(m.sally(1))
+
+
+    try:
+        print(m.arthur(1,2))
+    except TypeError:
+        pass
+    print(m.arthur(*(1,2,3)))
+
+
+    print(m.joe(1,{}))
+    assert m.joe(1, {}) == 'fred'
+    assert m.joe("huh", {}) == 'fred'
+
+    assert m("hello") == '__call__'
+
+
     assert m + 1 == '__add__'
     assert 1 + m == '__radd__'
     assert m % 1 == '__mod__'
@@ -102,6 +135,10 @@ def testMagic():
     assert str(m) == '__str__'
 
     assert m("hello") == '__call__'
+
+    print(m.joe(1,{}))
+    assert m.joe(1, {}) == 'fred'
+    assert m.joe("huh", {}) == 'fred'
 
     assert m[0] == '__index__'
     assert m[0:5] == '__index__'

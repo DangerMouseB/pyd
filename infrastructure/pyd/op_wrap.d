@@ -37,8 +37,8 @@ import pyd.exception;
 import pyd.make_object;
 
 import pyd.reboot.common : RebootFullTrace;
-import pyd.reboot._dispatch : memberfunc_to_func, method_dgwrap, applyFnDelegateToArgs;
-
+import pyd.reboot._dispatch : memberfunc_to_func, method_dgwrap, applyTernaryDelegateReturnPyObject, callFuncArgsKwargsReturnPyObject;
+import pyd.reboot.attributes : signatureWithAttributes, fnHasArgsAttr, fnHasKwargsAttr;
 
 
 // wrap a binary operator overload, handling __op__, __rop__, or
@@ -163,7 +163,7 @@ template powop_wrap(T, _lop, _rop) {
                     }else if(PyObject_IsInstance(o2, cast(PyObject*)&wtype)) {
                         goto rop;
                     }else{
-                        static if(RebootFullTrace) pragma(msg, "DB HERE");
+                        //static if(RebootFullTrace) pragma(msg, "DB HERE");
                         enforce(false, format(
                             "unsupported operand type(s) for %s: '%s' and '%s'",
                             opl.op, o1.ob_type.tp_name, o2.ob_type.tp_name,
@@ -212,19 +212,20 @@ template powopasg_wrap(T, alias fn) {
     }
 }
 
-template opcall_wrap(T, alias fn) {
+template opcall_wrap(C, alias fn, string classname) {
     // DBHERE
     import pyd.reboot.attributes : signatureWithAttributes;
-    static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #1");
-    static assert(constCompatible(constness!T, constness!(typeof(fn))),
+    //static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #1");
+    static assert(constCompatible(constness!C, constness!(typeof(fn))),
             format("constness mismatch instance: %s function: %s",
-                T.stringof, typeof(fn).stringof));
-    alias wtype = PydTypeObject!T;
-    alias get_dg = dg_wrapper!(T, typeof(&fn));
+                C.stringof, typeof(fn).stringof));
+    alias wtype = PydTypeObject!C;
+    alias get_dg = dg_wrapper!(C, typeof(&fn));
     alias OtherT = Parameters!(fn)[0];
     alias Ret = ReturnType!(fn);
+    enum string fname = classname~"__call__";
 
-    static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #2");
+    //static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #2");
     @(__traits(getAttributes, fn))
     extern(C)
     PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
@@ -234,18 +235,139 @@ template opcall_wrap(T, alias fn) {
                 PyErr_SetString(PyExc_TypeError, "OpCall didn't get a 'self' parameter.");
                 return null;
             }
-            T instance = get_d_reference!T(self);
+            C instance = get_d_reference!C(self);
             if (instance is null) {
                 PyErr_SetString(PyExc_ValueError, "Wrapped class instance is null!");
                 return null;
             }
-            auto dg = get_dg(instance, &fn);
-            pragma(msg, "pyd.op_wrap.opcall_wrap.func.exception_catcher #4");
-            return applyFnDelegateToArgs(dg, args);   // DBHERE add kwargs
+
+            alias sigHasArgs = fnHasArgsAttr!fn;
+            alias sigHasKwargs = fnHasKwargsAttr!fn;
+
+            static if (sigHasArgs && !sigHasKwargs){
+                // should do - figure where the arg is and place in tuple accordingly?
+                // SHOULDDO throw type error if we have kwargs
+                PyObject* self_args = PyTuple_New( cast(Py_ssize_t) 2);
+                scope(exit) {Py_XDECREF( self_args);}
+                enforce( self_args);
+                Py_INCREF( self);
+                PyTuple_SetItem( self_args, 0, self);
+                if (args is null) {
+                    PyObject* t = PyTuple_New(0);
+                    Py_INCREF( t);
+                    PyTuple_SetItem( self_args, 1, t);
+                } else {
+                    Py_INCREF( args);
+                    PyTuple_SetItem( self_args, 1, args);
+                }
+
+                alias func = memberfunc_to_func!(C, fn).func;
+                //static if(RebootFullTrace) pragma(msg, "pyd.reboot._dispatch.method_wrap func - "~signatureWithAttributes!func);
+                return callFuncArgsKwargsReturnPyObject!(func, fname)( self_args, null);
+
+            } else static if (!sigHasArgs && sigHasKwargs){
+                // should do - figure where the arg is and place in tuple accordingly?
+                // SHOULDDO throw type error if we have args
+                Py_ssize_t arglen = args is null ? 0 : PyObject_Length( args);
+                enforce( arglen != -1);
+                // if len args > 0 then throw a typr error
+                PyObject* self_kwargs = PyTuple_New( cast(Py_ssize_t) 2);
+                scope(exit) {Py_XDECREF( self_kwargs);}
+                enforce( self_kwargs);
+                Py_INCREF( self);
+                PyTuple_SetItem( self_kwargs, 0, self);
+                if (kwargs is null) {
+                    PyObject* d = PyDict_New();
+                    Py_INCREF( d);
+                    PyTuple_SetItem( self_kwargs, 1, d);
+                } else {
+                    Py_INCREF( kwargs);
+                    PyTuple_SetItem( self_kwargs, 1, kwargs);
+                }
+
+                alias func = memberfunc_to_func!(C, fn).func;
+                //static if(RebootFullTrace) pragma(msg, "pyd.reboot._dispatch.method_wrap func - "~signatureWithAttributes!func);
+                return callFuncArgsKwargsReturnPyObject!(func, fname)( self_kwargs, null);
+
+            } else static if (sigHasArgs && sigHasKwargs){
+                // should do - figure where the arg is and place in tuple accordingly?
+
+                PyObject* self_args_kwargs = PyTuple_New( cast(Py_ssize_t) 3);
+                scope(exit) {Py_XDECREF( self_args_kwargs);}
+                enforce( self_args_kwargs);
+                Py_INCREF( self);
+                PyTuple_SetItem( self_args_kwargs, 0, self);
+                if (args is null) {
+                    PyObject* t = PyTuple_New(0);
+                    Py_INCREF( t);
+                    PyTuple_SetItem( self_args_kwargs, 1, t);
+                } else {
+                    Py_INCREF( args);
+                    PyTuple_SetItem( self_args_kwargs, 1, args);
+                }
+                if (kwargs is null) {
+                    PyObject* d = PyDict_New();
+                    Py_INCREF( d);
+                    PyTuple_SetItem( self_args_kwargs, 2, d);
+                } else {
+                    Py_INCREF( kwargs);
+                    PyTuple_SetItem( self_args_kwargs, 2, kwargs);
+                }
+
+                alias func = memberfunc_to_func!(C, fn).func;
+                //static if(RebootFullTrace) pragma(msg, "pyd.reboot._dispatch.method_wrap func - "~signatureWithAttributes!func);
+                return callFuncArgsKwargsReturnPyObject!(func, fname)( self_args_kwargs, null);
+
+            } else {
+
+                Py_ssize_t arglen = args is null ? 0 : PyObject_Length( args);
+                enforce( arglen != -1);
+                PyObject* self_and_args = PyTuple_New( cast(Py_ssize_t) arglen+1);
+                scope(exit) {Py_XDECREF( self_and_args);}
+                enforce( self_and_args);
+                PyTuple_SetItem( self_and_args, 0, self);
+                Py_INCREF( self);
+                foreach (i; 0 .. arglen) {
+                    auto pobj = Py_XINCREF( PyTuple_GetItem( args, cast(Py_ssize_t) i));
+                    PyTuple_SetItem( self_and_args, cast(Py_ssize_t) i+1, pobj);
+                }
+                alias func = fredmemberfunc_to_func!(C, fn).func;
+                //static if(RebootFullTrace) pragma(msg, "pyd.reboot._dispatch.method_wrap func - "~signatureWithAttributes!func);
+                return callFuncArgsKwargsReturnPyObject!(func, fname)( self_and_args, kwargs);
+
+
+                //auto dg = get_dg( instance, &fn);
+                ////pragma(msg, "pyd.op_wrap.opcall_wrap.func.exception_catcher #4");
+                //return applyTernaryDelegateReturnPyObject( dg, args);   // DBHERE add kwargs
+            }
         });
     }
-    static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #3 fn -  "~signatureWithAttributes!fn);
-    static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #3 func -  "~signatureWithAttributes!func);
+}
+
+
+
+private template fredmemberfunc_to_func(T, alias fn) {
+    alias Ret = ReturnType!fn;
+    alias PS = ParameterTypeTuple!fn;
+    alias ids = ParameterIdentifierTuple!fn;
+    //alias dfs = ParameterDefaultValueTuple!fn;      //https://issues.dlang.org/show_bug.cgi?id=17192
+    alias dfs = WorkaroundParameterDefaults!fn;
+    enum params = getparams!(fn,"PS","dfs");
+    enum t = gensym!ids();
+
+    mixin(Replace!(
+    q{
+            @(__traits(getAttributes, fn))
+            Ret func(T $t, $params) {
+                auto dg = dg_wrapper($t, &fn);
+                return dg($ids);
+            }
+        },
+    "$params", params,
+    "$fn", __traits(identifier, fn),
+    "$t",t,
+    "$ids",Join!(",",ids)
+    ));
 }
 
 //----------------//

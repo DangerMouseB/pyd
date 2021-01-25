@@ -313,7 +313,7 @@ void py_finish() {
  * For extending python.
  */
 PyObject* module_init(string docstring="") {
-    pragma(msg, "module_init");
+    //pragma(msg, "module_init");
     Py_AtExit(&Py_Finalize_hook);
     string name = pyd_module_name;
     ready_module_methods("");

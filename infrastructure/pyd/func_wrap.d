@@ -44,8 +44,8 @@ import pyd.class_wrap;
 import pyd.exception;
 import pyd.make_object : d_to_python, python_to_d, items_to_PyTuple;
 
-import pyd.reboot.attributes : pyargs, pykwargs, pymagic, signatureWithAttributes;
-import pyd.reboot._dispatch : applyFnDelegateToArgs, applyFnAliasToArgsKwargsAnswerNoneIfVoid;
+import pyd.reboot.attributes : args, kwargs, pymagic, signatureWithAttributes;
+import pyd.reboot._dispatch : applyTernaryDelegateReturnPyObject, callFuncArgsKwargsReturnPyObject;
 import pyd.reboot._dispatch_utils : supportsNArgs, minArgs, maxArgs;
 
 
@@ -137,24 +137,24 @@ template wrapped_func_call(fn_t) {
 
         return exception_catcher(delegate PyObject*() {
             fn_t fn = get_d_reference!fn_t(self);
-            return applyFnDelegateToArgs(fn, args);  // DBHERE add kwargs
+            return applyTernaryDelegateReturnPyObject(fn, args);  // DBHERE add kwargs
         });
     }
 }
 
 
 // Wraps a function alias with a PyCFunctionWithKeywords.
-template function_wrap(alias real_fn, string fnname) {
-    alias Info = Parameters!real_fn;
+template function_wrap(alias fn, string fnname) {
+    alias Info = Parameters!fn;
     enum size_t MAX_ARGS = Info.length;
-    alias RT = ReturnType!real_fn;
+    alias RT = ReturnType!fn;
 
     extern (C)
     PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
         return exception_catcher(delegate PyObject*() {
             import thread = pyd.thread;
             thread.ensureAttached();
-            return applyFnAliasToArgsKwargsAnswerNoneIfVoid!(real_fn,fnname)(args, kwargs);
+            return callFuncArgsKwargsReturnPyObject!(fn, fnname)(args, kwargs);
         });
     }
 }

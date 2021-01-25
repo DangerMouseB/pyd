@@ -91,7 +91,7 @@ template wrapped_prop_list(T) {
 template wrapped_methods(T) {
     /// The generic "__new__" method
     extern(C)
-    PyObject* wrapped_new(PyTypeObject* type, PyObject* args, PyObject* kwds) {
+    PyObject* wrapped_new(PyTypeObject* type, PyObject* args, PyObject* kwargs) {
         return type.tp_alloc(type, 0);
     }
 
@@ -1220,7 +1220,7 @@ struct OpCall(Args_t...) {
 
     // DBHERE
     import pyd.reboot.attributes : signatureWithAttributes;
-    static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall #1");
+    //static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall #1");
 
 
     template Inner(T) {
@@ -1248,10 +1248,10 @@ struct OpCall(Args_t...) {
         alias cT = ApplyConstness!(T, constness!(typeof(fn)));
 
         // DBHERE
-        alias f = opcall_wrap!(cT, fn);
-        static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall.call #2  fn - "~signatureWithAttributes!fn);
+        alias f = opcall_wrap!(cT, fn, classname);
+        //static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall.call #2  fn - "~signatureWithAttributes!fn);
         type.tp_call = &f.func;
-        static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall.call #3  f - "~signatureWithAttributes!f);
+        //static if(RebootFullTrace) pragma(msg, "pyd.class_wrap.OpCall.call #3  f - "~signatureWithAttributes!f);
     }
     template shim(size_t i,T) {
         // bah

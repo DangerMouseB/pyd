@@ -11,7 +11,7 @@ import pyd.reboot.common : RebootFullTrace;
 
 // converts a pointer to a member function into a delegate.
 auto dg_wrapper(T, F) (T t, F fn) {
-    static if(RebootFullTrace) pragma(msg, "pyd.util.dg_wrapper.dg_wrapper fn - ");
+    //static if(RebootFullTrace) pragma(msg, "pyd.util.dg_wrapper.dg_wrapper fn - ");
     fn_to_dg!(F) dg;
     dg.ptr = cast(void*) t;
     static if(variadicFunctionStyle!fn == Variadic.typesafe) {

@@ -4,11 +4,11 @@ import std.exception : enforce;
 import std.algorithm : sort;
 import std.conv : to;
 import std.algorithm.mutation : SwapStrategy;
-import pyd.reboot.attributes : pymagic, pyclass;
+import pyd.reboot.attributes : pymagic;
 
 import py.magic : joe;
 
-@pyclass
+
 class Urm {
 
     int opBinaryRight(string op)(int lhs) if (op == "^^") {
