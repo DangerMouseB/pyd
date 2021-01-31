@@ -1,0 +1,9 @@
+name "reflection"
+description "Reflect on modules to access functions and data types"
+authors "Atila Neves"
+license "BSD"
+targetType "library"
+
+dependency "bones_vm:common" path="../common"
+dependency "bones_vm" path="../../.."
+dependency "mirror" version="~>0.3.0"

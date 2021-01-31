@@ -2,7 +2,7 @@ module pyd.util.dg_wrapper;
 
 import std.traits;
 
-import pyd.reboot.common : RebootFullTrace;
+import bones_vm.pyig.config : PyiTrace;
 
 
 // dirty hacks for converting between function and delegate types. As of DMD 0.174,
@@ -11,7 +11,7 @@ import pyd.reboot.common : RebootFullTrace;
 
 // converts a pointer to a member function into a delegate.
 auto dg_wrapper(T, F) (T t, F fn) {
-    //static if(RebootFullTrace) pragma(msg, "pyd.util.dg_wrapper.dg_wrapper fn - ");
+    //static if(PyiTrace) pragma(msg, "pyd.util.dg_wrapper.dg_wrapper fn - ");
     fn_to_dg!(F) dg;
     dg.ptr = cast(void*) t;
     static if(variadicFunctionStyle!fn == Variadic.typesafe) {

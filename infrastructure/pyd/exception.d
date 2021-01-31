@@ -25,11 +25,17 @@ SOFTWARE.
   */
 module pyd.exception;
 
+
 import std.conv;
 import std.string: format;
 import std.string;
-import deimos.python.Python;
 import std.traits : fullyQualifiedName;
+
+import deimos.python.Python;
+
+import pyd.conversions.python_to_d : python_to_d;
+
+
 
 /**
  * This function first checks if a Python exception is set, and then (if one
@@ -72,6 +78,7 @@ T error_code(T) () {
  *    });
  *})
  */
+// ?exception_catcher
 T exception_catcher(T) (T delegate() dg) {
     try {
         return dg();
@@ -121,9 +128,9 @@ T exception_catcher_nogc(T) (T delegate() dg) {
     }
 }
 
-alias exception_catcher!(PyObject*) exception_catcher_PyObjectPtr;
-alias exception_catcher!(int) exception_catcher_int;
-alias exception_catcher!(void) exception_catcher_void;
+alias exception_catcher_PyObjectPtr = exception_catcher!(PyObject*);
+alias exception_catcher_int = exception_catcher!(int);
+alias exception_catcher_void = exception_catcher!(void);
 
 string printSyntaxError(PyObject* type, PyObject* value, PyObject* traceback) {
     if(value is null) return "";
@@ -242,7 +249,6 @@ public:
                 }
             }
             if(pmsg) {
-                import pyd.make_object;
                 message = python_to_d!string(pmsg);
             }
         }

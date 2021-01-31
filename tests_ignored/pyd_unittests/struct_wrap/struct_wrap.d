@@ -42,11 +42,9 @@ struct Foo6 {
 }
 
 static this() {
+    on_py_init({add_module!(ModuleName!"testing")();});
     on_py_init({
-    add_module!(ModuleName!"testing")();
-    });
-    on_py_init({
-        wrap_struct!(
+        wrap_class!(
             Foo1,
             ModuleName!"testing",
             Init!(int,int,int),
@@ -55,7 +53,7 @@ static this() {
             Member!("k", Mode!"w"),
             Def!(Foo1.bar),
         )();
-        wrap_struct!(
+        wrap_class!(
             Foo2,
             ModuleName!"testing",
             Member!("i"),
@@ -63,23 +61,23 @@ static this() {
             Member!("d"),
             Member!("d2"),
         )();
-        wrap_struct!(
+        wrap_class!(
             Foo3,
             ModuleName!"testing",
             Member!"i",
             Member!"foo"
         )();
-        wrap_struct!(
+        wrap_class!(
             Foo4,
             ModuleName!"testing",
             Member!"j",
         )();
-        wrap_struct!(
+        wrap_class!(
             Foo5,
             ModuleName!"testing",
             Member!"foo",
         )();
-        wrap_struct!(
+        wrap_class!(
             Foo6,
             ModuleName!"testing",
             Member!"dateTime",
@@ -151,7 +149,7 @@ unittest {
 
 unittest {
     Foo5 a;
-    auto x = py(&a);
+    auto x = d_to_pydobject(&a);
     assert (x.toString().startsWith("<testing.Foo5"));
 }
 

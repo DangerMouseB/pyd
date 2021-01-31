@@ -23,15 +23,21 @@ SOFTWARE.
 /**
   Various utilities operating on non-standard python objects.
 */
+
 module pyd.extra;
+
 
 import std.traits;
 import std.complex;
 
 import pyd.pydobject;
 import pyd.exception;
-import pyd.make_object;
+import pyd.conversions.d_to_python : d_to_python;
+import pyd.conversions.python_to_d : get_type, SimpleFormatType;
+
 import deimos.python.Python;
+
+
 
 alias numpy_ndarray_Type = get_type!("numpy", "ndarray");
 
@@ -64,6 +70,7 @@ template NumpyFormatType(T) {
     }
 }
 static assert(NumpyFormatType!(Complex!float).supported);
+
 
 /**
   Convert a D array to numpy.ndarray.

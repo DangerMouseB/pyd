@@ -17,7 +17,7 @@ import deimos.python.Python;
 import pyd.pyd;
 import pyd.pydobject;
 import pyd.embedded;
-import pyd.reboot.common : RebootFullTrace;
+import bones_vm.pyig.config : PyiTrace;
 
 
 static this() {
@@ -28,7 +28,7 @@ static this() {
 }
 
 auto cantconvert(E)(lazy E e) {
-    return collectException!PydConversionException(e);
+    return collectException!PyToDConversionException(e);
 }
 
 version(Python_2_6_Or_Later) {
@@ -57,8 +57,8 @@ unittest {
     assert(py_eval!BigInt("6 ** 603") == BigInt("6") ^^ 603);
     assert(py_eval!BigInt("-6 ** 603") == -BigInt("6") ^^ 603);
     // BigInt -> python long
-    assert(py(BigInt("7") ^^ 47) == py_eval("7 ** 47"));
-    assert(py(-BigInt("7") ^^ 47) == py_eval("-7 ** 47"));
+    assert(d_to_pydobject(BigInt("7") ^^ 47) == py_eval("7 ** 47"));
+    assert(d_to_pydobject(-BigInt("7") ^^ 47) == py_eval("-7 ** 47"));
 }
 
 unittest {
@@ -258,8 +258,8 @@ unittest {
 }
 
 unittest {
-    auto py = py_eval("{'a': 'a'}");
-    auto d = python_to_d!(string[string])(cast(PyObject*) py.ptr());
+    auto o = py_eval("{'a': 'a'}");
+    auto d = python_to_d!(string[string])(cast(PyObject*) o.ptr());
     assert(d["a"] == "a");
 }
 
@@ -301,7 +301,7 @@ unittest {
     assert(cantconvert(py_eval!ubyte("int(300)")));
     //assert(cantconvert(py_eval!ubyte("int(-1)")));
 
-    assert(py(cast(byte)1) == py(1));
+    assert(d_to_pydobject(cast(byte)1) == d_to_pydobject(1));
 }
 
 unittest {
@@ -325,17 +325,17 @@ unittest {
 // string tests
 unittest {
     string simple = "abc123";
-    auto si = py(simple);
+    auto si = d_to_pydobject(simple);
     assert(si.to_d!string() == "abc123");
     assert(si.to_d!wstring() == "abc123"w);
     assert(si.to_d!dstring() == "abc123"d);
     wstring simplew = "abc123"w;
-    si = py(simplew);
+    si = d_to_pydobject(simplew);
     assert(si.to_d!string() == "abc123");
     assert(si.to_d!wstring() == "abc123"w);
     assert(si.to_d!dstring() == "abc123"d);
     dstring simpled = "abc123"d;
-    si = py(simpled);
+    si = d_to_pydobject(simpled);
     assert(si.to_d!string() == "abc123");
     assert(si.to_d!wstring() == "abc123"w);
     assert(si.to_d!dstring() == "abc123"d);

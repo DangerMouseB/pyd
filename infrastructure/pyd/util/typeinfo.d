@@ -88,7 +88,7 @@ template ApplyConstness2(T, Constness constness) {
     }else static if(constness == Constness.Const){
         alias ApplyConstness2 = const(Tu);
     }else static if(constness == Constness.Wildcard){
-            alias ApplyConstness2 = Tu;
+            alias ApplyConstness2 = Tu;                       // <--- different here
         }else static if(constness == Constness.Immutable){
                 alias ApplyConstness2 = immutable(Tu);
             }else{

@@ -2,7 +2,7 @@ module ut.pyd.func_wrap;
  
 
 import pyd.pyd, pyd.embedded;
-import pyd.reboot._dispatch_utils : supportsNArgs;
+import bones_vm.pyig._dispatch_utils : supportsNArgs;
 import core.vararg;
 
 void foo0() {

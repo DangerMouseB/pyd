@@ -20,18 +20,25 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-/**
-  Contains utilities for operating on generic python objects.
-  */
+// -------------------------------------------------------------------------------
+//  Contains utilities for operating on generic python objects.
+// -------------------------------------------------------------------------------
+
 module pyd.pydobject;
 
-import deimos.python.Python;
-import pyd.def;
-import pyd.exception;
-import pyd.make_object;
+
 import std.exception: enforce;
 import std.conv;
+
+import deimos.python.Python;
+
 import pyd.util.conv;
+
+import pyd.def;
+import pyd.exception;
+import pyd.conversions.d_to_python : d_to_python, items_to_PyTuple, d_to_pydobject;
+import pyd.conversions.python_to_d : python_to_d;
+
 
 
 /**
@@ -45,6 +52,7 @@ import pyd.util.conv;
  * See_Also:
  *     $(LINK2 http://docs.python.org/api/api.html, The Python/C API)
  */
+
 class PydObject {
 protected:
     PyObject* m_ptr;
@@ -617,7 +625,7 @@ Struct Format Strings </a>
         static if (is(T == PydObject)) {
             alias value v;
         }else{
-            auto v = py(value);
+            auto v = d_to_pydobject(value);
         }
         static if (is(S : int)) {
             if (PySequence_SetItem(m_ptr, key, v.m_ptr) == -1)
@@ -626,7 +634,7 @@ Struct Format Strings </a>
         }else static if (is(S == PydObject)) {
             alias key k;
         }else{
-            auto k = py(key);
+            auto k = d_to_pydobject(key);
         }
 
         static if(!(is(S : int))) {
@@ -767,7 +775,7 @@ Struct Format Strings </a>
             }
         }
         static if (!is(T == PydObject)) {
-            PydObject rhs = py(o);
+            PydObject rhs = d_to_pydobject(o);
         }else{
             alias o rhs;
         }
@@ -892,7 +900,7 @@ Struct Format Strings </a>
             }
         }
         static if (!is(T == PydObject)) {
-            PydObject rhs = py(o);
+            PydObject rhs = d_to_pydobject(o);
         }else{
             alias o rhs;
         }
@@ -1054,7 +1062,7 @@ Struct Format Strings </a>
         if(!PySequence_Check(m_ptr) && (PyDict_Check(m_ptr) || PyMapping_Check(m_ptr))) {
             return this.has_key(key);
         }else{
-            PydObject v = py(key);
+            PydObject v = d_to_pydobject(key);
             int result = PySequence_Contains(m_ptr, v.m_ptr);
             if (result == -1) handle_exception();
             return result == 1;
@@ -1168,7 +1176,7 @@ Struct Format Strings </a>
         static if(is(T == PydObject)) {
             alias val value;
         }else{
-            auto value = py(val);
+            auto value = d_to_pydobject(val);
         }
         this.setattr(nom,value);
     }

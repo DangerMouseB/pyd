@@ -98,8 +98,8 @@ unittest {
 
 unittest {
     InterpContext c = new InterpContext();
-    c.locals["i"] = py(1);
-    c.j = py(2);
+    c.locals["i"] = d_to_pydobject(1);
+    c.j = d_to_pydobject(2);
     c.k = 4;
     c.py_stmts("
         assert i == 1;

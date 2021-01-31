@@ -27,6 +27,7 @@ import std.traits;
 import std.exception: enforce;
 import std.string: format;
 import std.conv: to;
+import std.stdio : writeln;
 
 import deimos.python.Python;
 import pyd.util.typeinfo;
@@ -34,85 +35,16 @@ import pyd.util.dg_wrapper;
 import pyd.references;
 import pyd.class_wrap;
 import pyd.exception;
-import pyd.make_object;
-
-import pyd.reboot.common : RebootFullTrace;
-import pyd.reboot._dispatch : memberfunc_to_func, method_dgwrap, applyTernaryDelegateReturnPyObject, callFuncArgsKwargsReturnPyObject;
-import pyd.reboot.attributes : signatureWithAttributes, fnHasArgsAttr, fnHasKwargsAttr;
+import pyd.conversions.d_to_python : d_to_python;
+import pyd.conversions.python_to_d : python_to_d;
 
 
-// wrap a binary operator overload, handling __op__, __rop__, or
-// __op__ and __rop__ as necessary.
-// use new style operator overloading (ie check which arg is actually self).
-// _lop.C is a tuple w length 0 or 1 containing a BinaryOperatorX instance.
-// same for _rop.C.
-template binop_wrap(T, _lop, _rop) {
-    alias lop = _lop.C;
-    alias rop = _rop.C;
-    alias wtype = PydTypeObject!T;
-    static if(lop.length) {
-        alias lop[0] lop0;
-        alias lop0.Inner!T.FN lfn;
-        alias get_dgl = dg_wrapper!(T, typeof(&lfn));
-        alias Parameters!(lfn)[0] LOtherT;
-        alias ReturnType!(lfn) LRet;
-    }
-    static if(rop.length) {
-        alias rop[0] rop0;
-        alias rop0.Inner!T.FN rfn;
-        alias dg_wrapper!(T, typeof(&rfn)) get_dgr;
-        alias Parameters!(rfn)[0] ROtherT;
-        alias ReturnType!(rfn) RRet;
-    }
-    enum mode = (lop.length?"l":"")~(rop.length?"r":"");
-    extern(C)
-    PyObject* func(PyObject* o1, PyObject* o2) {
-        return exception_catcher(delegate PyObject*() {
-                enforce(is_wrapped!(T));
+import bones_vm.pyig.config : PyiTrace;
+import bones_vm.pyig._dispatch : memberfunc_to_func, method_dgwrap, applyTernaryDelegateReturnPyObject, callFuncArgsKwargsReturnPyObject;
+import bones_vm.pyig.attributes : signatureWithAttributes, fnHasArgsAttr, fnHasKwargsAttr;
 
-                static if(mode == "lr") {
-                    if (PyObject_IsInstance(o1, cast(PyObject*)&wtype)) {
-                        goto op;
-                    }else if(PyObject_IsInstance(o2, cast(PyObject*)&wtype)) {
-                        goto rop;
-                    }else{
-                        enforce(false, format(
-                            "unsupported operand type(s) for %s: '%s' and '%s'",
-                            lop[0].op, to!string(o1.ob_type.tp_name),
-                            to!string(o2.ob_type.tp_name),
-                        ));
-                    }
-                }
-                static if(mode.startsWith("l")) {
-op:
-                    auto dgl = get_dgl(get_d_reference!T(o1), &lfn);
-                    static if(lop[0].op.endsWith("=")) {
-                        dgl(python_to_d!LOtherT(o2));
-                        // why?
-                        // http://stackoverflow.com/questions/11897597/implementing-nb-inplace-add-results-in-returning-a-read-only-buffer-object
-                        // .. still don't know
-                        Py_INCREF(o1);
-                        return o1;
-                    }else static if (is(LRet == void)) {
-                        dgl(python_to_d!LOtherT(o2));
-                        return Py_INCREF(Py_None());
-                    } else {
-                        return d_to_python(dgl(python_to_d!LOtherT(o2)));
-                    }
-                }
-                static if(mode.endsWith("r")) {
-rop:
-                    auto dgr = get_dgr(get_d_reference!T(o2), &rfn);
-                    static if (is(RRet == void)) {
-                        dgr(python_to_d!ROtherT(o1));
-                        return Py_INCREF(Py_None());
-                    } else {
-                        return d_to_python(dgr(python_to_d!LOtherT(o1)));
-                    }
-                }
-        });
-    }
-}
+
+
 
 template binopasg_wrap(T, alias fn) {
     alias wtype = PydTypeObject!T;
@@ -120,8 +52,7 @@ template binopasg_wrap(T, alias fn) {
     alias OtherT = Parameters!(fn)[0];
     alias Ret = ReturnType!(fn) ;
 
-    extern(C)
-    PyObject* func(PyObject* self, PyObject* o2) {
+    extern(C) PyObject* func(PyObject* self, PyObject* o2) {
         auto dg = get_dg(get_d_reference!T(self), &fn);
         dg(python_to_d!OtherT(o2));
         // why?
@@ -132,67 +63,6 @@ template binopasg_wrap(T, alias fn) {
     }
 }
 
-// pow is special. its stupid slot is a ternary function.
-template powop_wrap(T, _lop, _rop) {
-    alias lop = _lop.C;
-    alias _rop.C rop;
-    alias PydTypeObject!T wtype;
-    static if(lop.length) {
-        alias lop[0] lop0;
-        alias lop0.Inner!T.FN lfn;
-        alias dg_wrapper!(T, typeof(&lfn)) get_dgl;
-        alias Parameters!(lfn)[0] LOtherT;
-        alias ReturnType!(lfn) LRet;
-    }
-    static if(rop.length) {
-        alias rop[0] rop0;
-        alias rop0.Inner!T.FN rfn;
-        alias dg_wrapper!(T, typeof(&rfn)) get_dgr;
-        alias Parameters!(rfn)[0] ROtherT;
-        alias ReturnType!(rfn) RRet;
-    }
-    enum mode = (lop.length?"l":"")~(rop.length?"r":"");
-    extern(C)
-    PyObject* func(PyObject* o1, PyObject* o2, PyObject* o3) {
-        return exception_catcher(delegate PyObject*() {
-                enforce(is_wrapped!(T));
-
-                static if(mode == "lr") {
-                    if (PyObject_IsInstance(o1, cast(PyObject*)&wtype)) {
-                        goto op;
-                    }else if(PyObject_IsInstance(o2, cast(PyObject*)&wtype)) {
-                        goto rop;
-                    }else{
-                        //static if(RebootFullTrace) pragma(msg, "DB HERE");
-                        enforce(false, format(
-                            "unsupported operand type(s) for %s: '%s' and '%s'",
-                            opl.op, o1.ob_type.tp_name, o2.ob_type.tp_name,
-                        ));
-                    }
-                }
-                static if(mode.startsWith("l")) {
-op:
-                    auto dgl = get_dgl(get_d_reference!T(o1), &lfn);
-                    static if (is(LRet == void)) {
-                        dgl(python_to_d!LOtherT(o2));
-                        return Py_INCREF(Py_None());
-                    } else {
-                        return d_to_python(dgl(python_to_d!LOtherT(o2)));
-                    }
-                }
-                static if(mode.endsWith("r")) {
-rop:
-                    auto dgr = get_dgr(get_d_reference!T(o2), &rfn);
-                    static if (is(RRet == void)) {
-                        dgr(python_to_d!ROtherT(o1));
-                        return Py_INCREF(Py_None());
-                    } else {
-                        return d_to_python(dgr(python_to_d!LOtherT(o1)));
-                    }
-                }
-        });
-    }
-}
 
 template powopasg_wrap(T, alias fn) {
     alias PydTypeObject!T wtype;
@@ -200,8 +70,7 @@ template powopasg_wrap(T, alias fn) {
     alias Parameters!(fn)[0] OtherT;
     alias ReturnType!(fn) Ret;
 
-    extern(C)
-    PyObject* func(PyObject* self, PyObject* o2, PyObject* o3) {
+    extern(C) PyObject* func(PyObject* self, PyObject* o2, PyObject* o3) {
         auto dg = get_dg(get_d_reference!T(self), &fn);
         dg(python_to_d!OtherT(o2));
         // why?
@@ -214,21 +83,20 @@ template powopasg_wrap(T, alias fn) {
 
 template opcall_wrap(C, alias fn, string classname) {
     // DBHERE
-    import pyd.reboot.attributes : signatureWithAttributes;
-    //static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #1");
+    import bones_vm.pyig.attributes : signatureWithAttributes;
+    //static if(PyiTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #1");
     static assert(constCompatible(constness!C, constness!(typeof(fn))),
             format("constness mismatch instance: %s function: %s",
                 C.stringof, typeof(fn).stringof));
     alias wtype = PydTypeObject!C;
     alias get_dg = dg_wrapper!(C, typeof(&fn));
-    alias OtherT = Parameters!(fn)[0];
+    //alias OtherT = Parameters!(fn)[0];   // DBHERE
     alias Ret = ReturnType!(fn);
     enum string fname = classname~"__call__";
 
-    //static if(RebootFullTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #2");
+    //static if(PyiTrace) pragma(msg, "pyd.op_wrap.opcall_wrap #2");
     @(__traits(getAttributes, fn))
-    extern(C)
-    PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
+    extern(C) PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
         return exception_catcher(delegate PyObject*() {
             // Didn't pass a "self" parameter! Ack!
             if (self is null) {
@@ -262,7 +130,7 @@ template opcall_wrap(C, alias fn, string classname) {
                 }
 
                 alias func = memberfunc_to_func!(C, fn).func;
-                //static if(RebootFullTrace) pragma(msg, "pyd.reboot._dispatch.method_wrap func - "~signatureWithAttributes!func);
+                //static if(PyiTrace) pragma(msg, "bones_vm.pyig._dispatch.method_wrap func - "~signatureWithAttributes!func);
                 return callFuncArgsKwargsReturnPyObject!(func, fname)( self_args, null);
 
             } else static if (!sigHasArgs && sigHasKwargs){
@@ -286,7 +154,7 @@ template opcall_wrap(C, alias fn, string classname) {
                 }
 
                 alias func = memberfunc_to_func!(C, fn).func;
-                //static if(RebootFullTrace) pragma(msg, "pyd.reboot._dispatch.method_wrap func - "~signatureWithAttributes!func);
+                //static if(PyiTrace) pragma(msg, "bones_vm.pyig._dispatch.method_wrap func - "~signatureWithAttributes!func);
                 return callFuncArgsKwargsReturnPyObject!(func, fname)( self_kwargs, null);
 
             } else static if (sigHasArgs && sigHasKwargs){
@@ -315,7 +183,7 @@ template opcall_wrap(C, alias fn, string classname) {
                 }
 
                 alias func = memberfunc_to_func!(C, fn).func;
-                //static if(RebootFullTrace) pragma(msg, "pyd.reboot._dispatch.method_wrap func - "~signatureWithAttributes!func);
+                //static if(PyiTrace) pragma(msg, "bones_vm.pyig._dispatch.method_wrap func - "~signatureWithAttributes!func);
                 return callFuncArgsKwargsReturnPyObject!(func, fname)( self_args_kwargs, null);
 
             } else {
@@ -331,8 +199,8 @@ template opcall_wrap(C, alias fn, string classname) {
                     auto pobj = Py_XINCREF( PyTuple_GetItem( args, cast(Py_ssize_t) i));
                     PyTuple_SetItem( self_and_args, cast(Py_ssize_t) i+1, pobj);
                 }
-                alias func = fredmemberfunc_to_func!(C, fn).func;
-                //static if(RebootFullTrace) pragma(msg, "pyd.reboot._dispatch.method_wrap func - "~signatureWithAttributes!func);
+                alias func = oldmemberfunc_to_func!(C, fn).func;
+                //static if(PyiTrace) pragma(msg, "bones_vm.pyig._dispatch.method_wrap func - "~signatureWithAttributes!func);
                 return callFuncArgsKwargsReturnPyObject!(func, fname)( self_and_args, kwargs);
 
 
@@ -346,7 +214,7 @@ template opcall_wrap(C, alias fn, string classname) {
 
 
 
-private template fredmemberfunc_to_func(T, alias fn) {
+private template oldmemberfunc_to_func(T, alias fn) {
     alias Ret = ReturnType!fn;
     alias PS = ParameterTypeTuple!fn;
     alias ids = ParameterIdentifierTuple!fn;
@@ -356,36 +224,31 @@ private template fredmemberfunc_to_func(T, alias fn) {
     enum t = gensym!ids();
 
     mixin(Replace!(
-    q{
+        q{
             @(__traits(getAttributes, fn))
             Ret func(T $t, $params) {
                 auto dg = dg_wrapper($t, &fn);
                 return dg($ids);
             }
         },
-    "$params", params,
-    "$fn", __traits(identifier, fn),
-    "$t",t,
-    "$ids",Join!(",",ids)
+        "$params", params,
+        "$fn", __traits(identifier, fn),
+        "$t",t,
+        "$ids",Join!(",",ids)
     ));
 }
 
-//----------------//
-// Implementation //
-//----------------//
 
-template opfunc_unary_wrap(T, alias opfn) {
-    extern(C)
-    PyObject* func(PyObject* self) {
-        // method_dgwrap takes care of exception handling
-        return method_dgwrap!(T, opfn).func(self, null);
-    }
-}
+//----------------
+// Implementation
+//----------------
+
+
+
 
 template opiter_wrap(T, alias fn){
-    alias Parameters!fn params;
-    extern(C)
-    PyObject* func(PyObject* self) {
+    alias params = Parameters!fn;
+    extern(C) PyObject* func(PyObject* self) {
         alias func = memberfunc_to_func!(T,fn).func;
         return exception_catcher(delegate PyObject*() {
             T t = python_to_d!T(self);
@@ -395,25 +258,24 @@ template opiter_wrap(T, alias fn){
     }
 }
 
+
 template opindex_wrap(T, alias fn) {
-    alias Parameters!fn Params;
-    alias dg_wrapper!(T, typeof(&fn)) get_dg;
+    alias Params = Parameters!fn;
+    alias get_dg = dg_wrapper!(T, typeof(&fn));
 
     // Multiple arguments are converted into tuples, and thus become a standard
     // wrapped member function call. A single argument is passed directly.
-    static if (Params.length == 1) {
-        alias Params[0] KeyT;
-        extern(C)
-        PyObject* func(PyObject* self, PyObject* key) {
+    static if (Params.length == 1){
+        alias KeyT = Params[0];
+        extern(C) PyObject* func(PyObject* self, PyObject* key) {
             return exception_catcher(delegate PyObject*() {
                 auto dg = get_dg(get_d_reference!T(self), &fn);
                 return d_to_python(dg(python_to_d!KeyT(key)));
             });
         }
-    } else {
-        alias method_dgwrap!(T, fn) opindex_methodT;
-        extern(C)
-        PyObject* func(PyObject* self, PyObject* key) {
+    }else{
+        alias opindex_methodT = method_dgwrap!(T, fn);
+        extern(C) PyObject* func(PyObject* self, PyObject* key) {
             Py_ssize_t args;
             if (!PyTuple_CheckExact(key)) {
                 args = 1;
@@ -429,13 +291,13 @@ template opindex_wrap(T, alias fn) {
     }
 }
 
-template opindexassign_wrap(T, alias fn) {
-    alias Parameters!(fn) Params;
 
-    static if (Params.length > 2) {
-        alias method_dgwrap!(T, fn) fn_wrap;
-        extern(C)
-        int func(PyObject* self, PyObject* key, PyObject* val) {
+template opindexassign_wrap(T, alias fn) {
+    alias Params = Parameters!(fn);
+
+    static if (Params.length > 2){
+        alias fn_wrap = method_dgwrap!(T, fn);
+        extern(C) int func(PyObject* self, PyObject* key, PyObject* val) {
             Py_ssize_t args;
             if (!PyTuple_CheckExact(key)) {
                 args = 2;
@@ -458,13 +320,12 @@ template opindexassign_wrap(T, alias fn) {
             fnwrap.func(self, temp);
             return 0;
         }
-    } else {
-        alias dg_wrapper!(T, typeof(&fn)) get_dg;
-        alias Params[0] ValT;
-        alias Params[1] KeyT;
+    }else{
+        alias get_dg = dg_wrapper!(T, typeof(&fn));
+        alias ValT = Params[0];
+        alias KeyT = Params[1];
 
-        extern(C)
-        int func(PyObject* self, PyObject* key, PyObject* val) {
+        extern(C) int func(PyObject* self, PyObject* key, PyObject* val) {
             return exception_catcher(delegate int() {
                 auto dg = get_dg(get_d_reference!T(self), &fn);
                 dg(python_to_d!ValT(val), python_to_d!KeyT(key));
@@ -474,32 +335,15 @@ template opindexassign_wrap(T, alias fn) {
     }
 }
 
-template inop_wrap(T, _lop, _rop) {
-    alias _rop.C rop;
-    static if(rop.length) {
-        alias rop[0] rop0;
-        alias rop0.Inner!T.FN rfn;
-        alias dg_wrapper!(T, typeof(&rfn)) get_dgr;
-        alias Parameters!(rfn)[0] ROtherT;
-    }
 
-    extern(C)
-    int func(PyObject* o1, PyObject* o2) {
-        return exception_catcher(delegate int() {
-            auto dg = get_dgr(get_d_reference!T(o1), &rfn);
-            return dg(python_to_d!ROtherT(o2));
-        });
-    }
-}
 
 template opcmp_wrap(T, alias fn) {
     static assert(constCompatible(constness!T, constness!(typeof(fn))),
             format("constness mismatch instance: %s function: %s",
                 T.stringof, typeof(fn).stringof));
-    alias Parameters!(fn) Info;
-    alias Info[0] OtherT;
-    extern(C)
-    int func(PyObject* self, PyObject* other) {
+    alias Info = Parameters!(fn);
+    alias OtherT = Info[0];
+    extern(C) int func(PyObject* self, PyObject* other) {
         return exception_catcher(delegate int() {
             int result = get_d_reference!T(self).opCmp(python_to_d!OtherT(other));
             // The Python API reference specifies that tp_compare must return
@@ -513,55 +357,11 @@ template opcmp_wrap(T, alias fn) {
     }
 }
 
-template rich_opcmp_wrap(T, alias fn) {
-    static assert(constCompatible(constness!T, constness!(typeof(fn))),
-            format("constness mismatch instance: %s function: %s",
-                T.stringof, typeof(fn).stringof));
-    alias Parameters!(fn) Info;
-    alias dg_wrapper!(T, typeof(&fn)) get_dg;
-    alias Info[0] OtherT;
-    extern(C)
-    PyObject* func(PyObject* self, PyObject* other, int op) {
-        return exception_catcher(delegate PyObject*() {
-            auto dg = get_dg(get_d_reference!T(self), &fn);
-            auto dother = python_to_d!OtherT(other);
-            int result = dg(dother);
-            bool pyresult;
-            switch(op) {
-                case Py_LT:
-                    pyresult = (result < 0);
-                    break;
-                case Py_LE:
-                    pyresult = (result <= 0);
-                    break;
-                case Py_EQ:
-                    pyresult = (result == 0);
-                    break;
-                case Py_NE:
-                    pyresult = (result != 0);
-                    break;
-                case Py_GT:
-                    pyresult = (result > 0);
-                    break;
-                case Py_GE:
-                    pyresult = (result >= 0);
-                    break;
-                default:
-                    assert(0);
-            }
-            if (pyresult) return Py_INCREF(Py_True);
-            else return Py_INCREF(Py_False);
-        });
-    }
-}
 
-//----------//
-// Dispatch //
-//----------//
+
 template length_wrap(T, alias fn) {
-    alias dg_wrapper!(T, typeof(&fn)) get_dg;
-    extern(C)
-    Py_ssize_t func(PyObject* self) {
+    alias get_dg = dg_wrapper!(T, typeof(&fn));
+    extern(C) Py_ssize_t func(PyObject* self) {
         return exception_catcher(delegate Py_ssize_t() {
             auto dg = get_dg(get_d_reference!T(self), &fn);
             return dg();
@@ -569,10 +369,10 @@ template length_wrap(T, alias fn) {
     }
 }
 
+
 template opslice_wrap(T,alias fn) {
-    alias dg_wrapper!(T, typeof(&fn)) get_dg;
-    extern(C)
-    PyObject* func(PyObject* self, Py_ssize_t i1, Py_ssize_t i2) {
+    alias get_dg = dg_wrapper!(T, typeof(&fn));
+    extern(C) PyObject* func(PyObject* self, Py_ssize_t i1, Py_ssize_t i2) {
         return exception_catcher(delegate PyObject*() {
             auto dg = get_dg(get_d_reference!T(self), &fn);
             return d_to_python(dg(i1, i2));
@@ -580,13 +380,13 @@ template opslice_wrap(T,alias fn) {
     }
 }
 
-template opsliceassign_wrap(T, alias fn) {
-    alias Parameters!fn Params;
-    alias Params[0] AssignT;
-    alias dg_wrapper!(T, typeof(&fn)) get_dg;
 
-    extern(C)
-    int func(PyObject* self, Py_ssize_t i1, Py_ssize_t i2, PyObject* o) {
+template opsliceassign_wrap(T, alias fn) {
+    alias Params = Parameters!fn;
+    alias AssignT = Params[0];
+    alias get_dg = dg_wrapper!(T, typeof(&fn));
+
+    extern(C) int func(PyObject* self, Py_ssize_t i1, Py_ssize_t i2, PyObject* o) {
         return exception_catcher(delegate int() {
             auto dg = get_dg(get_d_reference!T(self), &fn);
             dg(python_to_d!AssignT(o), i1, i2);

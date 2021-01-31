@@ -23,6 +23,8 @@ SOFTWARE.
 /// Contains utilities for embedding python in D.
 ///
 /// Importing this module will call Py_Initialize.
+
+
 module pyd.embedded;
 
 /+
@@ -40,11 +42,14 @@ module pyd.embedded;
  +/
 
 import deimos.python.Python;
+
 import pyd.pyd;
 import pyd.util.conv;
 import std.algorithm: findSplit;
 import std.string: strip, outdent;
 import std.traits;
+
+
 
 /++
  + Fetch a python module object.
@@ -76,7 +81,7 @@ class InterpContext {
     this() {
         debug assert(Py_IsInitialized(), "python not initialized");
         locals = new PydObject(PyDict_New());
-        globals = py(["__builtins__": new PydObject(PyEval_GetBuiltins())]);
+        globals = d_to_pydobject(["__builtins__": new PydObject(PyEval_GetBuiltins())]);
     }
 
     void pushDummyFrame() {
@@ -162,9 +167,9 @@ the result of expression
         static if(is(T == PydObject)) {
             alias t s;
         }else{
-            PydObject s = py(t);
+            PydObject s = d_to_pydobject(t);
         }
-        this.locals[id] = py(s);
+        this.locals[id] = d_to_pydobject(s);
     }
 }
 
@@ -196,7 +201,7 @@ ReturnType!func_t py_def( string python, string modl, func_t)
         auto globals = py_import(modl).getdict();
         auto globals_ptr = Py_INCREF(globals.ptr);
         scope(exit) Py_DECREF(globals_ptr);
-        auto locals = py((string[string]).init);
+        auto locals = d_to_pydobject((string[string]).init);
         auto locals_ptr = Py_INCREF(locals.ptr);
         scope(exit) Py_DECREF(locals_ptr);
         if("__builtins__" !in globals) {
@@ -238,7 +243,7 @@ T py_eval(T = PydObject)(string python, string modl = "", string file = __FILE__
     PydObject locals = null;
     PyObject* locals_ptr = null;
     if(modl == "") {
-        locals = py((string[string]).init);
+        locals = d_to_pydobject((string[string]).init);
     }else {
         locals = py_import(modl).getdict();
     }
@@ -275,7 +280,7 @@ void py_stmts(string python, string modl = "",string file = __FILE__, size_t lin
     PydObject locals;
     PyObject* locals_ptr;
     if(modl == "") {
-        locals = py((string[string]).init);
+        locals = d_to_pydobject((string[string]).init);
     }else {
         locals = py_import(modl).getdict();
     }

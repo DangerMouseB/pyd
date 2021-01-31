@@ -29,103 +29,19 @@ import deimos.python.Python;
 import pyd.util.typelist : Join;
 import pyd.util.typeinfo : NewParamT;
 import pyd.util.replace : Replace;
+
 import pyd.references;
 import pyd.class_wrap;
 import pyd.exception;
 import pyd.func_wrap;
-import pyd.make_object;
+import pyd.conversions.d_to_python : d_to_python;
+import pyd.conversions.python_to_d : python_to_d;
 
 
-import pyd.reboot._dispatch : callFuncArgsKwargsReturnDType;
-import pyd.reboot._dispatch_utils : supportsNArgs;
+import bones_vm.pyig._dispatch : callFuncArgsKwargsReturnDType;
+import bones_vm.pyig._dispatch_utils : supportsNArgs;
 
 
-template call_ctor(T, init) {
-    alias Parameters!(init.Inner!T.FN) paramtypes;
-    alias ParameterIdentifierTuple!(init.Inner!T.FN) paramids;
-    //https://issues.dlang.org/show_bug.cgi?id=17192
-    //alias ParameterDefaultValueTuple!(init.Inner!T.FN) dfs;
-    import pyd.util.typeinfo : WorkaroundParameterDefaults;
-    alias dfs = WorkaroundParameterDefaults!(init.Inner!T.FN);
-    enum params = getparams!(init.Inner!T.FN, "paramtypes", "dfs");
-    mixin(Replace!(q{
-    T func($params) {
-        return new $T($ids);
-    }
-    },"$params",params, "$ids", Join!(",",paramids),
-    "$T", (is(T == class)?"T":"PointerTarget!T")));
-}
-
-// The default __init__ method calls the class's zero-argument constructor.
-template wrapped_init(T) {
-    extern(C)
-    int init(PyObject* self, PyObject* args, PyObject* kwargs) {
-        return exception_catcher({
-            set_pyd_mapping(self, new T);
-            return 0;
-        });
-    }
-}
-
-// The __init__ slot for wrapped structs.
-template wrapped_struct_init(T) if (is(T == struct)){
-    extern(C)
-    int init(PyObject* self, PyObject* args, PyObject* kwargs) {
-        return exception_catcher({
-                T* t = new T;
-                set_pyd_mapping(self, t);
-                return 0;
-        });
-    }
-}
 
 
-// https://docs.python.org/3/c-api/typeobj.html#c.PyTypeObject.tp_new
-// PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds);
-
-// https://docs.python.org/3/c-api/typeobj.html#c.PyTypeObject.tp_init
-// int tp_init(PyObject *self, PyObject *args, PyObject *kwds);
-
-// This template accepts a tuple of function pointer types, which each describe
-// a ctor of T, and  uses them to wrap a Python tp_init function.
-template wrapped_ctors(string classname, T,Shim, C ...)
-if(is(T == class) || (isPointer!T && is(PointerTarget!T == struct))) {
-    //alias shim_class T;
-    alias wrapped_class_object!(T) wrap_object;
-    alias U = NewParamT!T;
-
-    extern(C)
-    static int func(PyObject* self, PyObject* args, PyObject* kwargs) {
-        Py_ssize_t arglen = PyObject_Length(args);
-        Py_ssize_t kwlen = kwargs is null?-1:PyObject_Length(kwargs);
-        enforce(arglen != -1);
-        Py_ssize_t len = arglen + ((kwlen == -1) ? 0 : kwlen);
-
-        return exception_catcher({
-            // Default ctor
-            static if (is(typeof(new U))) {
-                if (len == 0) {
-                    set_pyd_mapping(self, new U);
-                    return 0;
-                }
-            }
-            // find the first constructor that matches with supportsNArgs
-            foreach(i, init; C) {
-                if (supportsNArgs!(init.Inner!T.FN)(len)) {
-                    alias initFn = call_ctor!(T, init).func;
-                    T t = callFuncArgsKwargsReturnDType!(initFn, classname)(args, kwargs);
-                    if (t is null) {
-                        PyErr_SetString(PyExc_RuntimeError, "Class ctor redirect didn't return a class instance!");
-                        return -1;
-                    }
-                    set_pyd_mapping(self, t);
-                    return 0;
-                }
-            }
-            // No ctor found
-            PyErr_SetString(PyExc_TypeError, "Unsupported number of constructor arguments.");
-            return -1;
-        });
-    }
-}
 

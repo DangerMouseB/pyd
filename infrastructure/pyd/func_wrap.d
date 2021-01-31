@@ -42,11 +42,12 @@ import pyd.def;
 import pyd.references;
 import pyd.class_wrap;
 import pyd.exception;
-import pyd.make_object : d_to_python, python_to_d, items_to_PyTuple;
+import pyd.conversions.d_to_python : d_to_python, items_to_PyTuple;
+import pyd.conversions.python_to_d : python_to_d;
 
-import pyd.reboot.attributes : args, kwargs, pymagic, signatureWithAttributes;
-import pyd.reboot._dispatch : applyTernaryDelegateReturnPyObject, callFuncArgsKwargsReturnPyObject;
-import pyd.reboot._dispatch_utils : supportsNArgs, minArgs, maxArgs;
+import bones_vm.pyig.attributes : args, kwargs, signatureWithAttributes;
+import bones_vm.pyig._dispatch : applyTernaryDelegateReturnPyObject, callFuncArgsKwargsReturnPyObject;
+import bones_vm.pyig._dispatch_utils : supportsNArgs, minArgs, maxArgs;
 
 
 template hasFunctionAttrs(T) {
@@ -86,7 +87,7 @@ void PydWrappedFunc_Ready(S)() {
         type.tp_name = "PydFunc".ptr;
         type.tp_flags = Py_TPFLAGS_DEFAULT;
 
-        type.tp_call = &wrapped_func_call!(T).call;
+        type.tp_call = &wrapped_func_call!(T).func;
 
         PyType_Ready(&type);
         is_wrapped!T = true;
@@ -122,14 +123,13 @@ void setWrongArgsError(Py_ssize_t gotArgs, size_t minArgs, size_t maxArgs, strin
 }
 
 
-template wrapped_func_call(fn_t) {
+private template wrapped_func_call(fn_t) {
     enum size_t ARGS = Parameters!(fn_t).length;
     alias ReturnType!(fn_t) RT;
     // The entry for the tp_call slot of the PydFunc types.
     // (Or: What gets called when you pass a delegate or function pointer to
     // Python.)
-    extern(C)
-    PyObject* call(PyObject* self, PyObject* args, PyObject* kwargs) {
+    extern(C) PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
         if (self is null) {
             PyErr_SetString(PyExc_TypeError, "Wrapped method didn't get a function pointer.");
             return null;
@@ -149,8 +149,7 @@ template function_wrap(alias fn, string fnname) {
     enum size_t MAX_ARGS = Info.length;
     alias RT = ReturnType!fn;
 
-    extern (C)
-    PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
+    extern (C) PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
         return exception_catcher(delegate PyObject*() {
             import thread = pyd.thread;
             thread.ensureAttached();
@@ -200,8 +199,7 @@ private template _pycallable_asdgT(Dg) if(is(Dg == delegate)) {
     }
 }
 
-private
-class PydWrappedFunc {
+private class PydWrappedFunc {
     PyObject* callable;
 
     this(PyObject* c) {
@@ -217,39 +215,39 @@ class PydWrappedFunc {
     }
 
     Tr fn(Tr, T ...) (T t) {
-        PyObject* ret = call(t);
+        PyObject* ret = fn(t);
         if (ret is null) handle_exception();
         scope(exit) Py_DECREF(ret);
         return python_to_d!(Tr)(ret);
     }
     Tr fn_c(Tr, T ...) (T t) const {
-        PyObject* ret = call_c(t);
+        PyObject* ret = fn_const(t);
         if (ret is null) handle_exception();
         scope(exit) Py_DECREF(ret);
         return python_to_d!(Tr)(ret);
     }
     Tr fn_i(Tr, T ...) (T t) immutable {
-        PyObject* ret = call_i(t);
+        PyObject* ret = fn_immutable(t);
         if (ret is null) handle_exception();
         scope(exit) Py_DECREF(ret);
         return python_to_d!(Tr)(ret);
     }
 
-    PyObject* call(T ...) (T t) {
+    PyObject* fn(T ...) (T t) {
         enum size_t ARGS = T.length;
         PyObject* pyt = items_to_PyTuple(t);
         if (pyt is null) return null;
         scope(exit) Py_DECREF(pyt);
         return PyObject_CallObject(callable, pyt);
     }
-    PyObject* call_c(T ...) (T t) const {
+    PyObject* fn_const(T ...) (T t) const {
         enum size_t ARGS = T.length;
         PyObject* pyt = items_to_PyTuple(t);
         if (pyt is null) return null;
         scope(exit) Py_DECREF(pyt);
         return PyObject_CallObject(cast(PyObject*) callable, pyt);
     }
-    PyObject* call_i(T ...) (T t) immutable {
+    PyObject* fn_immutable(T ...) (T t) immutable {
         enum size_t ARGS = T.length;
         PyObject* pyt = items_to_PyTuple(t);
         if (pyt is null) return null;

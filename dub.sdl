@@ -1,0 +1,32 @@
+name "bones_vm"
+description "Testing pyd"
+targetType "dynamicLibrary"
+
+
+# To choose a configuration, use dub --config=<name>. By default, the first configuration
+# that matches the target type and build platform is selected automatically.
+
+# any folder "source" or "src" is automatically used as a source path if no sourcePaths setting is
+# specified - define "importPaths" as well as "sourcePaths" as they are independent
+
+
+platforms "osx"
+dflags "-version=AutowrapStrict"
+#lflags "-L$PYTHON_LIB_DIR"
+lflags "-L$PYD_LIBPYTHON_DIR"
+
+dependency "bones_vm:common" version="*"  # path="./infrastructure/autowrap/common"
+subPackage "infrastructure/autowrap/common"
+#dependency "bones_vm:reflection" version="*"  # path="./infrastructure/autowrap/reflection"
+#subPackage "infrastructure/autowrap/reflection"
+dependency "mirror" version="~>0.3.0"
+
+importPaths "infrastructure/"
+sourcePaths "infrastructure/pyd/" "infrastructure/deimos/" "infrastructure/bones_vm/"
+versions "Python_2_4_Or_Later" "Python_2_5_Or_Later" "Python_2_6_Or_Later" "Python_2_7_Or_Later" "Python_3_0_Or_Later" "Python_3_1_Or_Later" "Python_3_2_Or_Later" "Python_3_3_Or_Later" "Python_3_4_Or_Later" "Python_3_5_Or_Later" "Python_3_6_Or_Later" "Python_3_7_Or_Later" "Python_3_8_Or_Later"
+libs "python3.8"
+
+
+
+
+

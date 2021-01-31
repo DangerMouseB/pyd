@@ -1,0 +1,27 @@
+name "bones_vm_ex2"
+description "Testing autowrap, pyd and d2py"
+authors "David Briant"
+copyright "Copyright © 2021, David Briant"
+license "BSD"
+targetType "dynamicLibrary"
+
+
+# To choose a configuration, use dub --config=<name>. By default, the first configuration
+# that matches the target type and build platform is selected automatically.
+
+# any folder "source" or "src" is automatically used as a source path if no sourcePaths setting is
+# specified - define "importPaths" as well as "sourcePaths" as they are independent
+
+
+dependency "bones_vm" path="/Users/david/repos/github/ariovistus/pyd"
+platforms "osx"
+dflags "-version=AutowrapStrict"
+
+
+buildType "debug" {
+    postBuildCommands "if [ -f libbones_vm_ex2.dylib ]; then  mv libbones_vm_ex2.dylib bones_vm_ex2.so; fi" platform="osx"
+    preBuildCommands "if [ -f libbones_vm_ex2.dylib ]; then rm -f libbones_vm_ex2.dylib; fi" platform="osx"
+    preBuildCommands "if [ -f bones_vm_ex2.so ]; then rm -f bones_vm_ex2.so; fi" platform="osx"
+}
+
+

@@ -10,13 +10,13 @@ static this() {
 
 // PydObject as dict
 unittest {
-    auto g = py(["a":"b"]);
+    auto g = d_to_pydobject(["a":"b"]);
     version(Python_3_0_Or_Later) {
         assert((g.keys()).toString() == "['a']");
         assert((g.values()).toString() == "['b']");
         assert(g.items().toString() == "[('a', 'b')]");
         assert(g["a"].toString()  == "b");
-        g["b"] = py("truck");
+        g["b"] = d_to_pydobject("truck");
         assert(g.items().toString() == "[('a', 'b'), ('b', 'truck')]" ||
                 g.items().toString() == "[('b', 'truck'), ('a', 'b')]");
         foreach(key, val; g) {
@@ -31,11 +31,11 @@ unittest {
         g2.del_item("a");
         assert((g2.items()).toString() == "[]");
         assert((g.items()).toString() == "[('a', 'b')]");
-        g2 = py(["k":"z", "a":"f"]);
+        g2 = d_to_pydobject(["k":"z", "a":"f"]);
         g.merge(g2);
         assert(g.items().toString() == "[('k', 'z'), ('a', 'f')]" ||
                 g.items().toString() == "[('a', 'f'), ('k', 'z')]");
-        g = py(["a":"b"]);
+        g = d_to_pydobject(["a":"b"]);
         g.merge(g2,false);
         assert(g.items().toString() == "[('k', 'z'), ('a', 'b')]" ||
                 g.items().toString() == "[('a', 'b'), ('k', 'z')]");
@@ -48,7 +48,7 @@ unittest {
         assert((g.values()).toString() == "[u'b']");
         assert(g.items().toString() == "[(u'a', u'b')]");
         assert(g["a"].toString()  == "b");
-        g["b"] = py("truck");
+        g["b"] = d_to_pydobject("truck");
         assert(g.items().toString() == "[(u'a', u'b'), (u'b', u'truck')]" ||
                 g.items().toString() == "[(u'b', u'truck'), (u'a', u'b')]");
         foreach(key, val; g) {
@@ -63,11 +63,11 @@ unittest {
         g2.del_item("a");
         assert((g2.items()).toString() == "[]");
         assert((g.items()).toString() == "[(u'a', u'b')]");
-        g2 = py(["k":"z", "a":"f"]);
+        g2 = d_to_pydobject(["k":"z", "a":"f"]);
         g.merge(g2);
         assert(g.items().toString() == "[(u'k', u'z'), (u'a', u'f')]" ||
                 g.items().toString() == "[(u'a', u'f'), (u'k', u'z')]");
-        g = py(["a":"b"]);
+        g = d_to_pydobject(["a":"b"]);
         g.merge(g2,false);
         assert(g.items().toString() == "[(u'k', u'z'), (u'a', u'b')]" ||
                 g.items().toString() == "[(u'a', u'b'), (u'k', u'z')]");
@@ -77,123 +77,123 @@ unittest {
         assert(g.has_key("a"));
     }
 
-    g = py([5:7, 8:10]);
+    g = d_to_pydobject([5:7, 8:10]);
     g.clear();
     assert(g.length() == 0);
 }
 
 // PydObject as list
 unittest {
-    auto g = py(["a","b","c","e"]);
-    assert(py("a") in g);
+    auto g = d_to_pydobject(["a","b","c","e"]);
+    assert(d_to_pydobject("a") in g);
     assert("a" in g);
     assert("e" in g);
     foreach(i,x; g) {
-        if(i == py(0)) assert(x == py("a"));
-        if(i == py(1)) assert(x == py("b"));
-        if(i == py(2)) assert(x == py("c"));
-        if(i == py(3)) assert(x == py("e"));
+        if(i == d_to_pydobject(0)) assert(x == d_to_pydobject("a"));
+        if(i == d_to_pydobject(1)) assert(x == d_to_pydobject("b"));
+        if(i == d_to_pydobject(2)) assert(x == d_to_pydobject("c"));
+        if(i == d_to_pydobject(3)) assert(x == d_to_pydobject("e"));
     }
     {
         int i = 0;
         foreach(x; g) {
-            if(i == (0)) assert(x == py("a"));
-            if(i == (1)) assert(x == py("b"));
-            if(i == (2)) assert(x == py("c"));
-            if(i == (3)) assert(x == py("e"));
+            if(i == (0)) assert(x == d_to_pydobject("a"));
+            if(i == (1)) assert(x == d_to_pydobject("b"));
+            if(i == (2)) assert(x == d_to_pydobject("c"));
+            if(i == (3)) assert(x == d_to_pydobject("e"));
             i++;
         }
     }
-    auto g2 = g ~ py(["a","c","e"]);
-    assert(g2 == py(["a","b","c","e","a","c","e"]));
-    g ~= py(["a","c","e"]);
-    assert(g == py(["a","b","c","e","a","c","e"]));
-    //writeln(g.count(py(["c","e"])));
-    assert(g.count(py("c")) == 2);
-    assert(g.index(py("b")) == 1);
-    g.insert(3, py("X"));
-    assert(g == py(["a","b","c","X","e","a","c","e"]));
-    g.append(py("Z"));
-    assert(g == py(["a","b","c","X","e","a","c","e", "Z"]));
+    auto g2 = g ~ d_to_pydobject(["a","c","e"]);
+    assert(g2 == d_to_pydobject(["a","b","c","e","a","c","e"]));
+    g ~= d_to_pydobject(["a","c","e"]);
+    assert(g == d_to_pydobject(["a","b","c","e","a","c","e"]));
+    //writeln(g.count(d_to_pydobject(["c","e"])));
+    assert(g.count(d_to_pydobject("c")) == 2);
+    assert(g.index(d_to_pydobject("b")) == 1);
+    g.insert(3, d_to_pydobject("X"));
+    assert(g == d_to_pydobject(["a","b","c","X","e","a","c","e"]));
+    g.append(d_to_pydobject("Z"));
+    assert(g == d_to_pydobject(["a","b","c","X","e","a","c","e", "Z"]));
     g.sort();
-    assert(g == py(["X","Z","a","a","b","c","c","e","e"]));
+    assert(g == d_to_pydobject(["X","Z","a","a","b","c","c","e","e"]));
     g.reverse();
-    assert(g == py(["e","e","c","c","b","a","a","Z","X"]));
-    g = py(["a","b"]);
-    assert(g * 2 == py(["a","b","a","b"]));
+    assert(g == d_to_pydobject(["e","e","c","c","b","a","a","Z","X"]));
+    g = d_to_pydobject(["a","b"]);
+    assert(g * 2 == d_to_pydobject(["a","b","a","b"]));
     g *= 2;
-    assert(g == py(["a","b","a","b"]));
-    g = py(["a","b"]);
-    assert(g ~ ["z"] == py(["a","b","z"]));
-    assert(g ~ py(["z"]) == py(["a","b","z"]));
-    g ~= py(["f","h"]);
-    assert(g == py(["a","b","f","h"]));
+    assert(g == d_to_pydobject(["a","b","a","b"]));
+    g = d_to_pydobject(["a","b"]);
+    assert(g ~ ["z"] == d_to_pydobject(["a","b","z"]));
+    assert(g ~ d_to_pydobject(["z"]) == d_to_pydobject(["a","b","z"]));
+    g ~= d_to_pydobject(["f","h"]);
+    assert(g == d_to_pydobject(["a","b","f","h"]));
 }
 
 // PydObject as number (int? long? who know?)
 unittest {
-    auto n = py(1);
-    n = n + py(2);
-    assert(n == py(3));
-    assert(py(2) + 1 == py(3));
-    n = n * py(12);
-    assert(n == py(36));
-    n = n / py(5);
+    auto n = d_to_pydobject(1);
+    n = n + d_to_pydobject(2);
+    assert(n == d_to_pydobject(3));
+    assert(d_to_pydobject(2) + 1 == d_to_pydobject(3));
+    n = n * d_to_pydobject(12);
+    assert(n == d_to_pydobject(36));
+    n = n / d_to_pydobject(5);
     version(Python_3_0_Or_Later) {
-        assert(n == py(7.2));
+        assert(n == d_to_pydobject(7.2));
     }else{
-        assert(n == py(7));
+        assert(n == d_to_pydobject(7));
     }
-    n = py(36).floor_div(py(5));
-    assert(n == py(7));
-    n = py(36).true_div(py(5));
-    assert(n == py(7.2)); // *twitch*
-    n = (py(37).divmod(py(5)));
+    n = d_to_pydobject(36).floor_div(d_to_pydobject(5));
+    assert(n == d_to_pydobject(7));
+    n = d_to_pydobject(36).true_div(d_to_pydobject(5));
+    assert(n == d_to_pydobject(7.2)); // *twitch*
+    n = (d_to_pydobject(37).divmod(d_to_pydobject(5)));
     assert(n.toString() == "(7, 2)" || n.toString() == "(7L, 2L)");
-    n = py(37) % py(5);
-    assert(n == py(2));
-    n = py(3) ^^ py(4);
-    assert(n == py(81));
+    n = d_to_pydobject(37) % d_to_pydobject(5);
+    assert(n == d_to_pydobject(2));
+    n = d_to_pydobject(3) ^^ d_to_pydobject(4);
+    assert(n == d_to_pydobject(81));
     // holy guacamole! I didn't know Python's pow() did this!
-    n = py(13).pow(py(3), py(5));
-    assert(n == (py(13) ^^ py(3)) % py(5));
-    assert(n == py(2));
-    assert(py(1).abs() == py(1));
-    assert(py(-1).abs() == py(1));
-    assert(~py(2) == py(-3));
-    assert((py(15) >> py(3)) == py(1));
-    assert(py(1) << py(3) == py(8));
-    assert((py(7) & py(5)) == py(5));
-    assert((py(17) | py(5)) == py(21));
-    assert((py(17) ^ py(5)) == py(20));
+    n = d_to_pydobject(13).pow(d_to_pydobject(3), d_to_pydobject(5));
+    assert(n == (d_to_pydobject(13) ^^ d_to_pydobject(3)) % d_to_pydobject(5));
+    assert(n == d_to_pydobject(2));
+    assert(d_to_pydobject(1).abs() == d_to_pydobject(1));
+    assert(d_to_pydobject(-1).abs() == d_to_pydobject(1));
+    assert(~d_to_pydobject(2) == d_to_pydobject(-3));
+    assert((d_to_pydobject(15) >> d_to_pydobject(3)) == d_to_pydobject(1));
+    assert(d_to_pydobject(1) << d_to_pydobject(3) == d_to_pydobject(8));
+    assert((d_to_pydobject(7) & d_to_pydobject(5)) == d_to_pydobject(5));
+    assert((d_to_pydobject(17) | d_to_pydobject(5)) == d_to_pydobject(21));
+    assert((d_to_pydobject(17) ^ d_to_pydobject(5)) == d_to_pydobject(20));
 
-    n = py(1);
-    n += py(3);
-    assert(n == py(4));
-    n -= py(2);
-    assert(n == py(2));
-    n *= py(7);
-    assert(n == py(14));
-    n /= py(3);
+    n = d_to_pydobject(1);
+    n += d_to_pydobject(3);
+    assert(n == d_to_pydobject(4));
+    n -= d_to_pydobject(2);
+    assert(n == d_to_pydobject(2));
+    n *= d_to_pydobject(7);
+    assert(n == d_to_pydobject(14));
+    n /= d_to_pydobject(3);
     version(Python_3_0_Or_Later) {
-        assert(n == py(14./3)); // 4.6bar
-        assert(n.as_long() == py(4));
-        n = py(4);
+        assert(n == d_to_pydobject(14./3)); // 4.6bar
+        assert(n.as_long() == d_to_pydobject(4));
+        n = d_to_pydobject(4);
     }else{
-        assert(n == py(4));
+        assert(n == d_to_pydobject(4));
     }
-    n %= py(3);
-    assert(n == py(1));
-    n <<= py(4);
-    assert(n == py(16));
-    n >>= py(1);
-    assert(n == py(8));
-    n |= py(17);
-    assert(n == py(25));
-    n &= py(19);
-    assert(n == py(17));
-    n ^= py(11);
-    assert(n == py(26));
+    n %= d_to_pydobject(3);
+    assert(n == d_to_pydobject(1));
+    n <<= d_to_pydobject(4);
+    assert(n == d_to_pydobject(16));
+    n >>= d_to_pydobject(1);
+    assert(n == d_to_pydobject(8));
+    n |= d_to_pydobject(17);
+    assert(n == d_to_pydobject(25));
+    n &= d_to_pydobject(19);
+    assert(n == d_to_pydobject(17));
+    n ^= d_to_pydobject(11);
+    assert(n == d_to_pydobject(26));
 }
 
 // PydObject as python object
@@ -215,13 +215,13 @@ unittest {
             return "%s %s b %s" % (self.a, wongo, self.b)
 >", "testing");
     auto x = py_eval("X()","testing");
-    assert(x.getattr("a") == py("widget"));
-    assert(x.a == py("widget"));
-    assert(x.method("foo") == py("widget"));
-    assert(x[4] == py(1008));
+    assert(x.getattr("a") == d_to_pydobject("widget"));
+    assert(x.a == d_to_pydobject("widget"));
+    assert(x.method("foo") == d_to_pydobject("widget"));
+    assert(x[4] == d_to_pydobject(1008));
     auto xb = x.b;
     x[4] = 5;
-    assert(x.b == py(540));
+    assert(x.b == d_to_pydobject(540));
     x.b = xb;
     // *#^$&%#*(@*&$!!!!!
     // I long for the day..

@@ -1,0 +1,35 @@
+name "play"
+description "Testing pyd"
+targetType "dynamicLibrary"
+
+
+# To choose a configuration, use dub --config=<name>. By default, the first configuration
+# that matches the target type and build platform is selected automatically.
+
+# any folder "source" or "src" is automatically used as a source path if no sourcePaths setting is
+# specified - define "importPaths" as well as "sourcePaths" as they are independent
+
+
+#dependency "pyd" path="/Users/david/repos/github/ariovistus/pyd"
+platforms "osx"
+dflags "-version=AutowrapStrict"
+lflags "-L$PYTHON_LIB_DIR"
+
+#buildType "debug" {
+#    postBuildCommands "if [ -f libplay.dylib ]; then  mv libplay.dylib play.so; fi" platform="osx"
+#    preBuildCommands "if [ -f libplay.dylib ]; then rm -f libplay.dylib; fi" platform="osx"
+#    preBuildCommands "if [ -f play.so ]; then rm -f play.so; fi" platform="osx"
+#}
+
+importPaths "infrastructure/" "tests/"
+sourcePaths "infrastructure/pyd/" "infrastructure/deimos/" "tests/"
+versions "Python_2_4_Or_Later" "Python_2_5_Or_Later" "Python_2_6_Or_Later" "Python_2_7_Or_Later" "Python_3_0_Or_Later" "Python_3_1_Or_Later" "Python_3_2_Or_Later" "Python_3_3_Or_Later" "Python_3_4_Or_Later" "Python_3_5_Or_Later" "Python_3_6_Or_Later" "Python_3_7_Or_Later" "Python_3_8_Or_Later"
+libs "python3.8"
+
+configuration "unittest" {
+    importPaths "tests_rebooted/"
+    sourcePaths "tests_rebooted/"
+}
+
+
+

@@ -35,11 +35,12 @@ public {
     import pyd.def;
     import pyd.exception;
     import pyd.func_wrap;
-    import pyd.make_object;
+    import pyd.conversions.d_to_python;
+    import pyd.conversions.python_to_d;
     import pyd.pydobject;
-    import pyd.struct_wrap;
 
-    import pyd.reboot._dispatch_utils;
+    import bones_vm.pyig._dispatch_utils;
+    import bones_vm.pyig.wrappers : wrap_class;
 
     // Importing these is only needed as a workaround to bug #311
     import pyd.ctor_wrap;

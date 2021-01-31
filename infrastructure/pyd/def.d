@@ -29,6 +29,9 @@ import std.typetuple;
 import std.stdio;
 import std.traits;
 import std.exception;
+import std.exception: enforce;
+import std.algorithm: startsWith;
+import std.string: format;
 
 import deimos.python.Python;
 
@@ -36,19 +39,25 @@ import pyd.util.conv;
 import pyd.util.typelist;
 import pyd.func_wrap;
 
+
+
+PyObject*[string] pyd_modules;
+
+
 private PyMethodDef[] module_global_methods = [
     { null, null, 0, null }
 ];
 
 private PyMethodDef[][string] module_methods;
+
 version(Python_3_0_Or_Later) {
     private PyModuleDef*[string] pyd_moduledefs;
 }
-PyObject*[string] pyd_modules;
 
-// this appears to be a python3-only thing that holds instantiators
-// for wrapped classes and structs
-private void delegate()[string][string] pyd_module_classes;
+private void delegate()[string][string] pyd_module_classes;   // this appears to be a python3-only thing that holds instantiators for wrapped classes and structs
+
+
+
 
 private void ready_module_methods(string modulename) {
     PyMethodDef empty;
@@ -65,6 +74,7 @@ PyObject* Pyd_Module_p(string modulename="") {
     else return *m;
 }
 
+
 bool should_defer_class_wrap(string modulename, string classname) {
     version(Python_3_0_Or_Later) {
     return !(modulename in pyd_modules) && (modulename in pyd_module_classes)
@@ -73,12 +83,14 @@ bool should_defer_class_wrap(string modulename, string classname) {
         return false;
     }
 }
-void defer_class_wrap(string modulename, string classname,
-        void delegate() wrapper) {
+
+
+void defer_class_wrap(string modulename, string classname, void delegate() wrapper) {
     pyd_module_classes[modulename][classname] = wrapper;
 }
 
-/// Param of def
+
+// Param of def
 struct ModuleName(string _modulename) {
     enum modulename = _modulename;
 }
@@ -87,16 +99,18 @@ template IsModuleName(T...) {
     enum bool IsModuleName = T[0].stringof.startsWith("ModuleName!");
 }
 
-/// Param of def, Def, StaticDef
+
+// Param of def, Def, StaticDef
 struct Docstring(string _doc) {
     enum doc = _doc;
 }
-
 template IsDocstring(T...) {
     import std.algorithm: startsWith;
     enum bool IsDocstring = T[0].stringof.startsWith("Docstring!");
 }
-/// Param of def, Def, StaticDef
+
+
+// Param of def, Def, StaticDef
 struct PyName(string _name) {
     enum name = _name;
 }
@@ -105,57 +119,70 @@ template IsPyName(T...) {
     enum bool IsPyName = T[0].stringof.startsWith("PyName!");
 }
 
-/// Param of Property, Member
+
+// Param of Property, Member
 struct Mode(string _mode) {
     enum mode = _mode;
 }
 template IsMode(T...) {
-    import std.algorithm: startsWith;
     enum bool IsMode = T[0].stringof.startsWith("Mode!");
 }
 
-struct Args(string default_modulename,
-            string default_docstring,
-            string default_pyname,
-            string default_mode,
-            Params...) {
-    alias Filter!(IsDocstring, Params) Docstrings;
+
+struct Args(
+        string default_modulename,
+        string default_docstring,
+        string default_pyname,
+        string default_mode,
+        Params...
+) {
+
+    alias Docstrings = Filter!(IsDocstring, Params);
     static if(Docstrings.length) {
         enum docstring = Docstrings[0].doc;
     }else{
         enum docstring = default_docstring;
     }
-    alias Filter!(IsPyName, Params) PyNames;
+
+    alias PyNames = Filter!(IsPyName, Params);
     static if(PyNames.length) {
         enum pyname = PyNames[0].name;
     }else{
         enum pyname = default_pyname;
     }
-    alias Filter!(IsMode, Params) Modes;
+
+    alias Modes = Filter!(IsMode, Params);
     static if(Modes.length) {
         enum mode = Modes[0].mode;
     }else{
         enum mode = default_mode;
     }
-    alias Filter!(IsModuleName, Params) ModuleNames;
+
+    alias ModuleNames = Filter!(IsModuleName, Params);
     static if(ModuleNames.length) {
         enum modulename = ModuleNames[0].modulename;
     }else{
         enum modulename = default_modulename;
     }
 
-    alias Filter!(templateNot!IsModuleName,
-          Filter!(templateNot!IsDocstring,
-          Filter!(templateNot!IsPyName,
-          Filter!(templateNot!IsMode,
-              Params)))) rem;
+    alias rem = Filter!(
+        templateNot!IsModuleName,
+        Filter!(
+            templateNot!IsDocstring,
+            Filter!(
+                templateNot!IsPyName,
+                Filter!(
+                    templateNot!IsMode,
+                    Params)))
+    );
     template IsString(T...) {
         enum bool IsString = is(typeof(T[0]) == string);
     }
-    static if(Filter!(IsString, rem).length) {
-        static assert(false, "string parameters must be wrapped with Docstring, Mode, etc");
-    }
+    static assert(Filter!(IsString, rem).length == 0, "string parameters must be wrapped with Docstring, Mode, etc");
+
 }
+
+
 
 /**
 Wraps a D function, making it callable from Python.
@@ -198,14 +225,15 @@ It's greater than 10!)
  */
 
 
+// ?def
 void def(alias _fn, Options...)() {
-    alias Args!("","", __traits(identifier,_fn), "",Options) args;
+    alias args = Args!("","", __traits(identifier,_fn), "",Options);
     static if(args.rem.length) {
-        alias args.rem[0] fn_t;
+        alias fn_t = args.rem[0];
     }else {
-        alias typeof(&_fn) fn_t;
+        alias fn_t = typeof(&_fn);
     }
-    alias def_selector!(_fn, fn_t).FN fn;
+    alias fn = def_selector!(_fn, fn_t).FN;
 
     PyMethodDef empty;
     ready_module_methods(args.modulename);
@@ -218,48 +246,48 @@ void def(alias _fn, Options...)() {
     (*list) ~= empty;
 }
 
+
 template Typeof(alias fn0) {
-    alias typeof(&fn0) Typeof;
+    alias Typeof = typeof(&fn0);
 }
 
-template def_selector(alias fn, fn_t) {
-    import std.string: format;
 
-    alias alias_selector!(fn, fn_t) als;
+// ?def_selector
+template def_selector(alias fn, fn_t) {
+    alias als = alias_selector!(fn, fn_t);
     static if(als.VOverloads.length == 0 && als.Overloads.length != 0) {
-        alias staticMap!(Typeof, als.Overloads) OverloadsT;
-        static assert(0, format("%s not among %s",
-                    fn_t.stringof,OverloadsT.stringof));
+        alias OverloadsT = staticMap!(Typeof, als.Overloads);
+        pragma(msg, "def_selector ", fn_t, ", ", OverloadsT.stringof);
+        static assert(0, format("%s not among %s", fn_t.stringof,OverloadsT.stringof));
     }else static if(als.VOverloads.length > 1){
-        static assert(0, format("%s: Cannot choose between %s", als.nom,
-                    staticMap!(Typeof, als.VOverloads)));
+        static assert(0, format("%s: Cannot choose between %s", als.nom, staticMap!(Typeof, als.VOverloads)));
     }else{
-        alias als.VOverloads[0] FN;
+        alias FN = als.VOverloads[0];
     }
 }
 
 template IsEponymousTemplateFunction(alias fn) {
     // dmd issue 13372: its not a bug, its a feature!
-    alias TypeTuple!(__traits(parent, fn))[0] Parent;
+    alias Parent = TypeTuple!(__traits(parent, fn))[0];
     enum IsEponymousTemplateFunction = is(typeof(Parent) == typeof(fn));
 }
 
 template alias_selector(alias fn, fn_t) {
-    alias Parameters!fn_t ps;
-    alias ReturnType!fn_t ret;
-    alias TypeTuple!(__traits(parent, fn))[0] Parent;
+    alias ps = Parameters!fn_t;
+    alias ret = ReturnType!fn_t;
+    alias Parent = TypeTuple!(__traits(parent, fn))[0];
     enum nom = __traits(identifier, fn);
     template IsDesired(alias f) {
-        alias Parameters!f fps;
-        alias ReturnType!f fret;
+        alias fps = Parameters!f;
+        alias fret = ReturnType!f;
         enum bool IsDesired = is(ps == fps) && is(fret == ret);
     }
     static if(IsEponymousTemplateFunction!fn) {
-        alias TypeTuple!(fn) Overloads;
+        alias Overloads = TypeTuple!(fn);
     }else{
-        alias TypeTuple!(__traits(getOverloads, Parent, nom)) Overloads;
+        alias Overloads = TypeTuple!(__traits(getOverloads, Parent, nom));
     }
-    alias Filter!(IsDesired, Overloads) VOverloads;
+    alias VOverloads = Filter!(IsDesired, Overloads);
 }
 
 string pyd_module_name;
@@ -269,23 +297,24 @@ string pyd_module_name;
 /// is not advised.
 __gshared Py_Finalize_called = false;
 
+
 extern(C) void Py_Finalize_hook() {
     import thread = pyd.thread;
     Py_Finalize_called = true;
     thread.detachAll();
 }
 
-version(PydPythonExtension)
-{
+
+version(PydPythonExtension){
+
     /// For embedding python
-    void py_innit()()
-    {
+    void py_innit()() {
         static assert(false, "py_init should only be called when embedding python");
     }
-}
-else
-{
-    /// For embedding python
+
+}else {
+
+    /// For extending python
     void py_init() {
         doActions(PyInitOrdering.Before);
         Py_Initialize();
@@ -299,7 +328,9 @@ else
             }
         }
     }
+
 }
+
 
 /// For embedding python, should you wish to restart the interpreter.
 void py_finish() {
@@ -308,12 +339,13 @@ void py_finish() {
     py_init_called = false;
 }
 
+
 /**
  * Module initialization function. Should be called after the last call to def.
  * For extending python.
  */
 PyObject* module_init(string docstring="") {
-    //pragma(msg, "module_init");
+    pragma(msg, "--- module_init");
     Py_AtExit(&Py_Finalize_hook);
     string name = pyd_module_name;
     ready_module_methods("");
@@ -411,13 +443,12 @@ void doActions(PyInitOrdering which) {
     }
 }
 
-///
+
 enum PyInitOrdering{
-    /// call will be made before Py_Initialize.
-    Before,
-    /// call will be made after Py_Initialize.
-    After,
+    Before,     // call will be made before Py_Initialize.
+    After,      // call will be made after Py_Initialize.
 }
+
 
 /// call will be made at the appropriate time for initializing
 /// modules.  (for python 2, it should be after Py_Initialize,
@@ -428,14 +459,13 @@ version(Python_3_0_Or_Later) {
     enum PyInitOrdering ModuleInit = PyInitOrdering.After;
 }
 
+
 /**
   Use this to wrap calls to add_module and the like.
 
   py_init will ensure they are called at the appropriate time
   */
 void on_py_init(void delegate() dg, PyInitOrdering ord = ModuleInit) {
-    import std.exception: enforce;
-
     with(PyInitOrdering) switch(ord) {
         case Before:
             if(py_init_called) {

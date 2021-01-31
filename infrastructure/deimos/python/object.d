@@ -199,7 +199,8 @@ alias PyObject* function(PyObject*, PyObject*, PyObject*) ternaryfunc;
 /// _
 alias Py_ssize_t function(PyObject*) lenfunc;
 /// _
-alias lenfunc inquiry;
+//alias inquiry = lenfunc;
+alias inquiry = int function(PyObject*);    // DBHERE
 version(Python_3_0_Or_Later) {
 }else{
     /// Availability: 2.*
