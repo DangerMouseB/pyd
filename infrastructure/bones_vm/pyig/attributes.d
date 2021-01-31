@@ -2,8 +2,9 @@ module bones_vm.pyig.attributes;
 
 import std.traits : hasUDA;
 
-struct kwargs { string name; this(string name) {this.name = name;}}
-struct args { string name; this(string name) {this.name = name;}}
+enum kwargs;
+enum args;
+enum include;
 
 
 // unaryfunc - PyObject *(*unaryfunc)(PyObject *)¶
@@ -26,8 +27,91 @@ struct args { string name; this(string name) {this.name = name;}}
 // objobjproc - int (*objobjproc)(PyObject *, PyObject *)
 // inquiry - int (*inquiry)(PyObject *self)
 
-// getattrfunc - deprecated
-// setattrfunc - deprecated
+
+
+// PyTypeObject Definition
+// https://docs.python.org/3/c-api/typeobj.html#pytypeobject-definition
+
+//typedef struct _typeobject {
+//    PyObject_VAR_HEAD
+//    const char *tp_name; /* For printing, in format "<module>.<name>" */
+//    Py_ssize_t tp_basicsize, tp_itemsize; /* For allocation */
+//
+//    /* Methods to implement standard operations */
+//
+//    destructor tp_dealloc;
+//    Py_ssize_t tp_vectorcall_offset;
+//    getattrfunc tp_getattr;
+//    setattrfunc tp_setattr;
+//    PyAsyncMethods *tp_as_async; /* formerly known as tp_compare (Python 2)
+//                                    or tp_reserved (Python 3) */
+//    reprfunc tp_repr;
+//
+//    /* Method suites for standard classes */
+//
+//    PyNumberMethods *tp_as_number;
+//    PySequenceMethods *tp_as_sequence;
+//    PyMappingMethods *tp_as_mapping;
+//
+//    /* More standard operations (here for binary compatibility) */
+//
+//    hashfunc tp_hash;
+//    ternaryfunc tp_call;
+//    reprfunc tp_str;
+//    getattrofunc tp_getattro;
+//    setattrofunc tp_setattro;
+//
+//    /* Functions to access object as input/output buffer */
+//    PyBufferProcs *tp_as_buffer;
+//
+//    /* Flags to define presence of optional/expanded features */
+//    unsigned long tp_flags;
+//
+//    const char *tp_doc; /* Documentation string */
+//
+//    /* call function for all accessible objects */
+//    traverseproc tp_traverse;
+//
+//    /* delete references to contained objects */
+//    inquiry tp_clear;
+//
+//    /* rich comparisons */
+//    richcmpfunc tp_richcompare;
+//
+//    /* weak reference enabler */
+//    Py_ssize_t tp_weaklistoffset;
+//
+//    /* Iterators */
+//    getiterfunc tp_iter;
+//    iternextfunc tp_iternext;
+//
+//    /* Attribute descriptor and subclassing stuff */
+//    struct PyMethodDef *tp_methods;
+//    struct PyMemberDef *tp_members;
+//    struct PyGetSetDef *tp_getset;
+//    struct _typeobject *tp_base;
+//    PyObject *tp_dict;
+//    descrgetfunc tp_descr_get;
+//    descrsetfunc tp_descr_set;
+//    Py_ssize_t tp_dictoffset;
+//    initproc tp_init;
+//    allocfunc tp_alloc;
+//    newfunc tp_new;
+//    freefunc tp_free; /* Low-level free-memory routine */
+//    inquiry tp_is_gc; /* For PyObject_IS_GC */
+//    PyObject *tp_bases;
+//    PyObject *tp_mro; /* method resolution order */
+//    PyObject *tp_cache;
+//    PyObject *tp_subclasses;
+//    PyObject *tp_weaklist;
+//    destructor tp_del;
+//
+//    /* Type attribute cache version tag. Added in version 2.6 */
+//    unsigned int tp_version_tag;
+//
+//    destructor tp_finalize;
+//
+//} PyTypeObject;
 
 
 
@@ -40,78 +124,61 @@ enum __call__;                      // tp_call - ternaryfunc
 enum __str__;                       // tp_str - reprfunc
 
 
+// A key difference between __getattr__ and __getattribute__ is that __getattr__
+// is only invoked if the attribute wasn't found the usual ways
+
 enum __getattribute__;             // tp_getattro - getattrofunc
 enum __getattr__;
 
 enum __setattr__;                   // tp_setattro - setattrofunc
 enum __delattr__;
 
+//PyBufferProcs *tp_as_buffer;
+
 enum __doc__;                       // tp_doc - const char *
 
 
-enum __lt__;                        // tp_richcompare - richcmpfunc
+enum __richcmpfunc__;             // tp_richcompare - richcmpfunc - a function that handles all following
+enum __lt__;
 enum __le__;
 enum __eq__;
 enum __ne__;
 enum __gt__;
 enum __ge__;
-enum __richcmpfunc__;             // a function that handles all the above
 
 
 enum __iter__;                      // tp_iter - getiterfunc
 enum __next__;                     // tp_iternext - iternextfunc
 
 
-enum __new__;                       // tp_new - newfunc
 enum __init__;                      // tp_init - initproc
+enum __new__;                       // tp_new - newfunc
 enum __del__;                       // tp_finalize - destructor
 
 
 
+// Number Object Structures - PyNumberMethods* tp_as_number
+// https://docs.python.org/3/c-api/typeobj.html#number-object-structures
 
 // sub-slots
 
-enum __add__;            // nb_add - binaryfunc
+enum __add__;           // nb_add - binaryfunc
 enum __radd__;
 
 enum __sub__;           // nb_subtract - binaryfunc
 enum __rsub__;
 
-enum __mul__;            // nb_multiply - binaryfunc
+enum __mul__;           // nb_multiply - binaryfunc
 enum __rmul__;
 
-
-enum __pow__;            // nb_power - ternaryfunc
+enum __pow__;           // nb_power - ternaryfunc, nb_inplace_power - ternaryfunc
 enum __rpow__;
 
-
-enum __matmul__;        // nb_matrix_multiply - binaryfunc
-enum __rmatmul__;
-
-enum __matmul__ip__;   // nb_inplace_matrix_multiply - binaryfunc
-
-
-
-
-enum __len__;            // mp_length - lenfunc
-enum __getitem__;       // mp_subscript - binaryfunc
-enum __setitem__;       // mp_ass_subscript - objobjargproc
-enum __delitem__;
-
-enum __len__sq__;      // sq_length - lenfunc
-enum __add__sq__;     // sq_concat - binaryfunc
-enum __mul__sq__;     // sq_repeat - ssizeargfunc
-
-
-enum __getitem__sq__;   // sq_item - ssizeargfunc
-
-enum __setitem__sq__;   // sq_ass_item - ssizeobjargproc
-enum __delitem__sq__;
-enum __contains__sq__;  // sq_contains - objobjproc
-
+enum __neg__;           // nb_negative - unaryfunc
+enum __pos__;           // nb_positive - unaryfunc
+enum __abs__;           // nb_absolute - unaryfunc
 
 enum __bool__;          // nb_bool - inquiry
-
 enum __invert__;        // nb_invert - unaryfunc
 
 enum __lshift__;        // nb_lshift - binaryfunc
@@ -122,13 +189,40 @@ enum __rshift__;        // nb_rshift - binaryfunc
 enum __rrshift__;
 enum __rshift__ip__;   // nb_inplace_rshift - binaryfunc
 
+enum __index__;           // nb_index - unary func
+
+enum __matmul__;        // nb_matrix_multiply - binaryfunc
+enum __rmatmul__;
+enum __matmul__ip__;   // nb_inplace_matrix_multiply - binaryfunc
 
 
-enum __getattribute__dep__;      // (tp_getattr) - getattrfunc
-enum __getattr__dep__;
 
-enum __setattr__dep__;           // (tp_setattr) - setattrfunc
-enum __delattr__dep__;
+// Mapping Object Structures - PyMappingMethods* tp_as_mapping
+// https://docs.python.org/3/c-api/mapping.html
+// https://docs.python.org/3/c-api/typeobj.html#mapping-object-structures
+
+enum __len__mp__;            // mp_length - lenfunc
+enum __getitem__mp__;       // mp_subscript - binaryfunc
+enum __setitem__mp__;       // mp_ass_subscript - objobjargproc
+enum __delitem__mp__;
+
+
+
+// Sequence Object Structures - PySequenceMethods* tp_as_sequence
+// https://docs.python.org/3/c-api/sequence.html
+// https://docs.python.org/3/c-api/typeobj.html#sequence-object-structures
+
+enum __len__;             // sq_length - lenfunc - pyd.class_wrap.Len
+enum __add__sq__;       // sq_concat - binaryfunc - pyd.class_wrap.binaryslots - "~": "type.tp_as_sequence.sq_concat"
+enum __mul__sq__;       // sq_repeat - ssizeargfunc
+
+enum __getitem__;        // sq_item - ssizeargfunc
+enum __setitem__;        // sq_ass_item - ssizeobjargproc
+enum __delitem__;
+enum __contains__;       // sq_contains - objobjproc - pyd.class_wrap.binaryslots - "in": "type.tp_as_sequence.sq_contains"
+
+enum __add__sq__ip__;     // sq_inplace_concat - binaryfunc - pyd.class_wrap.binaryslots - "~=": "type.tp_as_sequence.sq_inplace_concat"
+enum __mul__sq__ip__;     // ssizeargfunc
 
 
 
@@ -137,7 +231,9 @@ enum __enter__;             // as far as I can tell not part of the cpython api 
 enum __exit__;
 
 
-//class.__instancecheck__(self, instance)¶
+
+
+//class.__instancecheck__(self, instance)
 //Return true if instance should be considered a (direct or indirect) instance of class. If defined, called to implement isinstance(instance, class).
 //
 //class.__subclasscheck__(self, subclass)
@@ -145,7 +241,6 @@ enum __exit__;
 //__reversed__
 
 
-// A key difference between __getattr__ and __getattribute__ is that __getattr__ is only invoked if the attribute wasn't found the usual ways.
 
 
 
@@ -186,6 +281,4 @@ string signatureWithAttributes(alias fn)() {
 
 bool fnHasArgsAttr(alias x)() {return hasUDA!(x, args);}
 bool fnHasKwargsAttr(alias x)() {return hasUDA!(x, kwargs);}
-bool fnHasMagicAttr(alias x)() {return hasUDA!(x, pymagic);}
-bool fnHasIgnoreAttr(alias x)() {return hasUDA!(x, pymagic);}
 

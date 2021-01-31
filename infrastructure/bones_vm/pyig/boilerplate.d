@@ -18,6 +18,7 @@ import std.array: join;
 
 import autowrap.types: Modules, LibraryName, PreModuleInitCode, PostModuleInitCode, RootNamespace;
 
+import bones_vm.pyig.config : ShowPyInitSrc;
 
 
 /**
@@ -25,23 +26,23 @@ import autowrap.types: Modules, LibraryName, PreModuleInitCode, PostModuleInitCo
    to create a Python library containing one Python module
    wrapping all relevant D code and data structures.
  */
-string genPydMain(
+string genPydMainSrcFor(
         LibraryName libraryName,
         Modules modules,
         RootNamespace _ = RootNamespace(),  // ignored in this backend
         PreModuleInitCode preModuleInitCode = PreModuleInitCode(),
         PostModuleInitCode postModuleInitCode = PostModuleInitCode()
 ) () {
-
-    return __ctfe
-        ? wrapAll(libraryName, modules, preModuleInitCode, postModuleInitCode)
-        : null;
+    if (__ctfe) {
+        enum src = wrapAll(libraryName, modules, preModuleInitCode, postModuleInitCode);
+        if (ShowPyInitSrc) pragma(msg, src);
+        return src;
+    } else {
+        return null;
+    }
 }
 
 
-/**
-   answers generated srcCode that defines all the necessary runtime pyd boilerplate.
- */
 string wrapAll(
         in LibraryName libraryName,
         in Modules modules,
@@ -86,13 +87,13 @@ string pydMainDSrc(
         extern(C) void PydMain() {
             import std.typecons: Yes, No;
             import pyd.pyd: module_init, add_module, ModuleName;
-            import bones_vm.pyig.boilerplate_utils: wrapAllFunctions, wrapAllAggregates;
+            import bones_vm.pyig.scanning: createFunctionAdaptorsFor, createAggregateAdaptorsFor;
 
             // this must go before module_init
 
             add_module!(ModuleName!"bones_vm")();
 
-            wrapAllFunctions!(%s);
+            createFunctionAdaptorsFor!(%s);
 
             %s
 
@@ -100,7 +101,7 @@ string pydMainDSrc(
 
 
             // this must go after module_init
-            wrapAllAggregates!(%s);
+            createAggregateAdaptorsFor!(%s);
 
             %s
         }

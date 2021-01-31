@@ -32,12 +32,13 @@ import pyd.util.dg_wrapper : dg_wrapper;
 import pyd.exception : exception_catcher, handle_exception, PythonException;
 import pyd.references : get_d_reference;
 import pyd.func_wrap : setWrongArgsError, getparams;
-import pyd.make_object : d_to_python, python_to_d;
+import pyd.conversions.d_to_python : d_to_python;
+import pyd.conversions.python_to_d : python_to_d;
 
 import bones_vm.pyig.attributes : signatureWithAttributes, fnHasArgsAttr, fnHasKwargsAttr;
 import bones_vm.pyig._dispatch_utils : supportsNArgs, minArgs, maxArgs, gensym;
 import bones_vm.pyig.utils : TupleComposer;
-import bones_vm.pyig.common : PyiTrace;
+import bones_vm.pyig.config : PyiTrace;
 
 
 
@@ -358,8 +359,7 @@ template method_wrap(C, alias fn, string fname) {
     enum size_t ARGS = Info.length;
     alias RT = ReturnType!fn;
 
-    extern(C)
-    PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
+    extern(C) PyObject* func(PyObject* self, PyObject* args, PyObject* kwargs) {
         return exception_catcher(delegate PyObject*() {
 
             if (self is null) {
@@ -552,8 +552,7 @@ template method_dgwrap(C, alias fn) {
     alias Info = Parameters!fn;
     enum size_t ARGS = Info.length;
     alias RT = ReturnType!fn;
-    extern(C)
-    PyObject* func(PyObject* self, PyObject* args) {
+    extern(C) PyObject* func(PyObject* self, PyObject* args) {
         return exception_catcher(delegate PyObject*() {
             // Didn't pass a "self" parameter! Ack!
             if (self is null) {
@@ -566,7 +565,7 @@ template method_dgwrap(C, alias fn) {
                 return null;
             }
             auto dg = dg_wrapper!(C, typeof(&fn))(instance, &fn);
-            return applyTernaryDelegateReturnPyObject(dg, args);  // DBHERE add kwargs
+            return applyTernaryDelegateReturnPyObject(dg, args);
         });
     }
 }
@@ -634,49 +633,3 @@ private PyObject* arrangeNamedArgs(alias fn, string fname)(PyObject* args, PyObj
 }
 
 
-
-//binaryfunc PyNumberMethods.nb_subtract
-//binaryfunc PyNumberMethods.nb_multiply
-//binaryfunc PyNumberMethods.nb_remainder
-//binaryfunc PyNumberMethods.nb_divmod
-//ternaryfunc PyNumberMethods.nb_power
-//unaryfunc PyNumberMethods.nb_negative
-//unaryfunc PyNumberMethods.nb_positive
-//unaryfunc PyNumberMethods.nb_absolute
-//inquiry PyNumberMethods.nb_bool
-//unaryfunc PyNumberMethods.nb_invert
-//binaryfunc PyNumberMethods.nb_lshift
-//binaryfunc PyNumberMethods.nb_rshift
-//binaryfunc PyNumberMethods.nb_and
-//binaryfunc PyNumberMethods.nb_xor
-//binaryfunc PyNumberMethods.nb_or
-//unaryfunc PyNumberMethods.nb_int
-//void *PyNumberMethods.nb_reserved
-//unaryfunc PyNumberMethods.nb_float
-//binaryfunc PyNumberMethods.nb_inplace_add
-//binaryfunc PyNumberMethods.nb_inplace_subtract
-//binaryfunc PyNumberMethods.nb_inplace_multiply
-//binaryfunc PyNumberMethods.nb_inplace_remainder
-//ternaryfunc PyNumberMethods.nb_inplace_power
-//binaryfunc PyNumberMethods.nb_inplace_lshift
-//binaryfunc PyNumberMethods.nb_inplace_rshift
-//binaryfunc PyNumberMethods.nb_inplace_and
-//binaryfunc PyNumberMethods.nb_inplace_xor
-//binaryfunc PyNumberMethods.nb_inplace_or
-//binaryfunc PyNumberMethods.nb_floor_divide
-//binaryfunc PyNumberMethods.nb_true_divide
-//binaryfunc PyNumberMethods.nb_inplace_floor_divide
-//binaryfunc PyNumberMethods.nb_inplace_true_divide
-//unaryfunc PyNumberMethods.nb_index
-//binaryfunc PyNumberMethods.nb_matrix_multiply
-//binaryfunc PyNumberMethods.nb_inplace_matrix_multiply
-//
-//PyObject *(*unaryfunc)(PyObject *)
-//PyObject *(*binaryfunc)(PyObject *, PyObject *)
-//PyObject *(*ternaryfunc)(PyObject *, PyObject *, PyObject *)
-//PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t)
-//
-//
-//nb_power            __pow__ __rpow__
-//nb_inplace_power   __pow__
-//
